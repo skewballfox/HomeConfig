@@ -1,0 +1,32 @@
+packages:
+  gui:  
+    dnf:
+      - google-chrome-stable
+      - code
+  rpm:
+    - gopass
+    - gopass-jsonapi
+    - gnupg2-gpg-agent
+    - gnupg2-scdaemon
+    - fish
+    - bat
+    - htop
+    - just
+    - yazi
+    - direnv
+    - fira-code-fonts
+    - atuin
+  dnf:
+    - nix
+  ostree:
+    - nix-core
+  flatpaks:
+    - com.github.tchx84.Flatseal
+    - com.stremio.Stremio
+    - org.signal.Signal
+    - md.obsidian.Obsidian
+    - com.slack.Slack
+    - org.zulip.Zulip
+    - net.ankiweb.Anki
+  uv:
+    - whisper-ctranslate2

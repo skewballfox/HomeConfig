@@ -1,0 +1,7 @@
+{{- $hasGUI := promptBoolOnce . "hasGUI" "Does this machine have a GUI" }}
+[data]
+    email = "joshua.ferguson.273@gmail.com"
+    name = "Joshua Ferguson"
+    pkey = "36CDF972E044DB6D68E3162DF92AFF72AFCE13A8"
+    signkey = "92E1DBE0BCAB0361"
+    hasGUI = {{ $hasGUI }}

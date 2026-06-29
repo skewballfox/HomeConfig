@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+KEYID={{ .pkey }}
+gpg --recv-keys --keyserver hkps://openpgp.org $KEYID
+gpg --command-fd=0 --pinentry-mode=loopback --edit-key $KEYID <<EOF
+trust
+5
+y
+save
+EOF
+
+git config --global user.email={{ .email }}
+git config --global user.name={{ .name }}
+git config --global commit.gpgsign=true
+git config --global user.signingkey={{ .signkey }}
+git config --global credential.helper=/usr/libexec/git-core/git-credential-libsecret
+git config --global init.defaultBranch main
+git config --global merge.conflictstyle=zdiff3
+git config --global core.pager=delta
+git config --global interactive.difffilter=delta --color-only
+git config --global delta.navigate=true
+git config --global delta.dark=true
+
+git config --global fetch.recursesubmodules=true
+git config --global submodules.recurse=true
+
+git config --global filter.lfs.required=true
+git config --global filter.lfs.clean=git-lfs clean -- %f
+git config --global filter.lfs.smudge=git-lfs smudge -- %f
+git config --global filter.lfs.process=git-lfs filter-process
+
+mkdir -p ~/Workspace ~/Media/{Video,Audio/Music,Documents,Images,VM}
+rm ~/{Pictures,Music,Videos,Documents}

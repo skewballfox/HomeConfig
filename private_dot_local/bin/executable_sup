@@ -1,0 +1,78 @@
+#!/bin/sh
+
+# update flatpak user packages
+if command -v flatpak
+then
+    flatpak --user update -y
+fi
+
+# update rust
+if command -v rustup
+then
+    rustup update
+fi
+
+#handle rustowl separately
+if command -v rustowl
+then
+    rustup run nightly-2025-02-22 cargo install rustowl --locked
+fi
+
+if command -v rustowlc
+then
+    rustup run nightly-2025-02-22 cargo install rustowl --locked
+fi
+
+# update packages installed via cargo
+if command -v cargo install-update
+then
+    cargo install-update -a
+fi
+
+# update pipx packages
+if command -v pipx
+then
+    pipx upgrade-all
+fi
+
+# update uv packages
+if command -v uv
+then
+    uv tool upgrade --all
+fi
+
+#update rye
+if command -v rye
+then
+    rye self update
+fi
+
+# update pip packages
+user_pips=$(pip list --user --outdated | tail -n +3 | awk '{ print $1 }')
+if ! [ -z "$user_pips" ]
+then
+    pip install --user "$user_pips" --upgrade
+fi
+
+# npm update -g
+if command -v npm
+then
+    npm update -g
+fi
+
+#update go packages
+if command -v go
+then
+    go get -u all
+fi
+
+# update kakoune plugins
+if command -v kak
+then
+    if command -v cork
+    then
+        cork update
+    else 
+        kak -e plug-update
+    fi
+fi

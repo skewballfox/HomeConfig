@@ -1,0 +1,8 @@
+[".gnupg/gpg.conf"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/drduh/YubiKey-Guide/master/config/gpg.conf"
+    refreshPeriod = "168h"
+[".gnupg/gpg-agent.conf"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/drduh/YubiKey-Guide/master/config/gpg-agent.conf"
+    refreshPeriod = "168h"
