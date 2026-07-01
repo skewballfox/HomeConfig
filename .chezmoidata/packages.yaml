@@ -3,6 +3,7 @@ packages:
     dnf:
       - google-chrome-stable
       - code
+      - kitty
   rpm:
     - gopass
     - gopass-jsonapi
@@ -16,6 +17,7 @@ packages:
     - direnv
     - fira-code-fonts
     - atuin
+    - kitty-terminfo
   dnf:
     - nix
   ostree:
