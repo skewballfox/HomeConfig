@@ -1,0 +1,4 @@
+theme = "onedarker"
+
+[keys.normal]
+"#" = "toggle_line_comments"
