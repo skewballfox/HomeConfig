@@ -4,9 +4,11 @@ packages:
       - google-chrome-stable
       - code
       - kitty
+      - fira-code-fonts
+      - gopass-jsonapi
   rpm:
+    - tailscale
     - gopass
-    - gopass-jsonapi
     - gnupg2-gpg-agent
     - gnupg2-scdaemon
     - fish
@@ -15,7 +17,6 @@ packages:
     - just
     - helix
     - direnv
-    - fira-code-fonts
     - atuin
     - kitty-terminfo
   dnf:
