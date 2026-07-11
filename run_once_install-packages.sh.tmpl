@@ -7,24 +7,25 @@ set -e
 {{- $pkgs := list }} 
 {{- if $isSilverblue }} 
 {{-   $AuthCmd = "run0"}} 
-{{-   $pkgInstall = cat $AuthCmd "rpm-ostree install" }} 
+{{-   $pkgInstall = cat $AuthCmd "rpm-ostree install --allow-inactive" }} 
 {{- end }}  
 
 {{- if $isFedora }}
 {{-   $pkgs = .packages.rpm }}
       # On all rpm variants
       {{ $AuthCmd }} curl -fsSL https://pkgs.tailscale.com/stable/fedora/tailscale.repo -o /etc/yum.repos.d/tailscale.repo
-      flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-      flatpak --user update -y
 {{-   if $isSilverblue }} 
 {{-     $pkgs = concat $pkgs .packages.ostree }}
+        brew install {{- range .packages.brew }} {{ . }} {{- end }}
 {{-   else }}
         # Fedora specific
         {{ $pkgInstall }} https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
         {{ $pkgInstall }} https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
 {{-     if .hasGUI }}
+          {{ $pkgs = concat $pkgs .packages.gui.dnf }}
           # GUI packages
-          {{ $pkgs = concat $pkgs .packages.gui.dnf }} 
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak --user update -y
           flatpak --user update -y
           flatpak install --user -y {{- range .packages.flatpaks }} {{ . }} {{- end }}
           # VS Code repo
@@ -53,5 +54,5 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # uv tools (common to both)
 {{- range .packages.uv }}
-uv tool install {{ . }}
+"$HOME"/.local/bin/uv tool install {{ . }}
 {{- end }}

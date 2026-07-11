@@ -6,23 +6,29 @@ packages:
       - kitty
       - fira-code-fonts
       - gopass-jsonapi
+      - gopass
   rpm:
     - tailscale
-    - gopass
     - gnupg2-gpg-agent
     - gnupg2-scdaemon
     - fish
-    - bat
-    - htop
-    - just
-    - helix
-    - direnv
-    - atuin
     - kitty-terminfo
   dnf:
     - nix
+    - just
+    - htop
+    - direnv
+    - atuin
   ostree:
     - nix-core
+  brew:
+    - helix
+    - bat
+    - htop
+    - direnv
+    - atuin
+    - carapace
+    - yazi
   flatpaks:
     - com.github.tchx84.Flatseal
     - com.stremio.Stremio
