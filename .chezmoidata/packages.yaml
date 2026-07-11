@@ -7,10 +7,10 @@ packages:
       - fira-code-fonts
       - gopass-jsonapi
       - gopass
+      - gnupg2-scdaemon
+      - gnupg2-gpg-agent
   rpm:
     - tailscale
-    - gnupg2-gpg-agent
-    - gnupg2-scdaemon
     - fish
     - kitty-terminfo
   dnf:
@@ -19,6 +19,7 @@ packages:
     - htop
     - direnv
     - atuin
+    - git-delta
   ostree:
     - nix-core
   brew:
@@ -29,6 +30,7 @@ packages:
     - atuin
     - carapace
     - yazi
+    - git-delta
   flatpaks:
     - com.github.tchx84.Flatseal
     - com.stremio.Stremio

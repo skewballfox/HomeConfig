@@ -27,7 +27,7 @@ git config --global filter.lfs.smudge "git-lfs smudge -- %f"
 git config --global filter.lfs.process "git-lfs filter-process"
 
 mkdir -p ~/Workspace ~/Media/{Video,Audio/Music,Documents,Images,VM}
-rmdir ~/{Pictures,Music,Videos,Documents}
+rmdir -p  ~/{Pictures,Music,Videos,Documents} 2>/dev/null || true
 
-test -x fish && chsh -s $(which fish) $(whoami)
+[ -x "$(command -v fish)" ] && chsh -s "$(command -v fish)" "$(whoami)" || true
 gpg --export-ssh-key 36CDF972E044DB6D68E3162DF92AFF72AFCE13A8 > ~/.ssh/yubikey.pub

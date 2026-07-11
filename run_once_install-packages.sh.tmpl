@@ -7,7 +7,7 @@ set -e
 {{- $pkgs := list }} 
 {{- if $isSilverblue }} 
 {{-   $AuthCmd = "run0"}} 
-{{-   $pkgInstall = cat $AuthCmd "rpm-ostree install --allow-inactive" }} 
+{{-   $pkgInstall = "rpm-ostree install --allow-inactive --idempotent" }} 
 {{- end }}  
 
 {{- if $isFedora }}
