@@ -1,0 +1,15 @@
+{
+  "icon_theme": "Zed (Default)",
+  "theme": {
+    "mode": "dark",
+    "light": "One Light",
+    "dark": "Ayu Dark"
+  },
+  "buffer_font_family": "Fira Code",
+  "buffer_font_size": 13,
+  "buffer_font_features": {
+    "calt": true
+  },
+  "vim_mode": true,
+  "helix_mode": true
+}
