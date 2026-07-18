@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -e
+{{- if .isFedora }}
+    # On all rpm variants
+    {{ .authCmd }} curl -fsSL https://pkgs.tailscale.com/stable/fedora/tailscale.repo -o /etc/yum.repos.d/tailscale.repo
+    {{-   if not .isSilverblue }}
+        {{ .pkgInstall }} https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+        {{ .pkgInstall }} https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+    {{-   end }}
+    {{-     if .hasGUI }}
+          # GUI packages
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak --user update -y
+          # VS Code repo
+          {{ .authCmd }} rpm --import https://packages.microsoft.com/keys/microsoft.asc 
+          printf '[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\nautorefresh=1\ntype=rpm-md\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc\n' \
+            | {{ .authCmd }} tee /etc/yum.repos.d/vscode.repo > /dev/null
+          {{ .pkgInstall }} fedora-workstation-repositories 
+          {{ .authCmd }} dnf config-manager setopt google-chrome.enabled=1
+    {{-     end }}
+{{- end }}

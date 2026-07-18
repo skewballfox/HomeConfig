@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# ble-nightly release published: {{ (gitHubRelease "akinomyoga/ble.sh" "nightly").PublishedAt }}
+set -euo pipefail
+
+workdir="$(mktemp -d /tmp/ble-nightly.XXXXXX)"
+trap 'rm -rf "$workdir"' EXIT
+
+curl -fsSL https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-nightly.tar.xz \
+  | tar xJf - -C "$workdir"
+
+bash "$workdir/ble-nightly/ble.sh" --install ~/.local/share

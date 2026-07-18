@@ -12,9 +12,8 @@
     url = "https://raw.githubusercontent.com/drduh/YubiKey-Guide/master/config/gpg-agent.conf"
     refreshPeriod = "168h"
 {{- end }}
-[".local/bin/ble.sh"]
-    type = "archive-file"
+["tmp/ble-nightly"]
+    type = "archive"
     url = "https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-nightly.tar.xz"
     refreshPeriod = "168h"
-    executable = true
-    path = "ble-nightly/ble.sh"
+    stripComponents = 1

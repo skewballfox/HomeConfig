@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -e
+# Install rustup
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+. "$HOME/.cargo/env"
+
+# Install cargo-binstall
+curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+cargo install cargo-update
+
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh

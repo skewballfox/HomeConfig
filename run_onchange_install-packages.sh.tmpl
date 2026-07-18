@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -e 
+{{- $pkgs := list }} 
+
+
+{{- if .isFedora }}
+{{-   $pkgs = .packages.rpm }}
+{{-   if .isSilverblue }} 
+{{-     $pkgs = concat $pkgs .packages.ostree }}
+        brew install {{- range .packages.brew }} {{ . }} {{- end }}
+{{-   else }}
+{{-     if .hasGUI }}
+          {{ $pkgs = concat $pkgs .packages.gui.dnf }}
+          # GUI packages
+          flatpak --user update -y
+          flatpak install --user -y {{- range .packages.flatpaks }} {{ . }} {{- end }}
+{{-     end }} 
+{{-   end }}
+{{- end }}
+  
+{{ .pkgInstall }} {{- range $pkgs }} {{ . }} {{- end }}
+
+# uv tools (common to both)
+{{- range .packages.uv }}
+"$HOME"/.local/bin/uv tool install {{ . }}
+{{- end }}

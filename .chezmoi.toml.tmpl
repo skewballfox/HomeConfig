@@ -1,7 +1,19 @@
 {{- $hasGUI := promptBoolOnce . "hasGUI" "Does this machine have a GUI" }}
+{{- $isFedora := has .chezmoi.osRelease.id (list "fedora" "silverblue" "secureblue") }} 
+{{- $isSilverblue := has .chezmoi.osRelease.variant ( list "silverblue" "CoreOS") }} 
+{{- $AuthCmd := "sudo" }} 
+{{- $pkgInstall := cat $AuthCmd "dnf install -y" }} 
+{{- if $isSilverblue }} 
+{{-   $AuthCmd = "run0"}} 
+{{-   $pkgInstall = "rpm-ostree install --allow-inactive --idempotent" }} 
+{{- end }}  
 [data]
     email = "joshua.ferguson.273@gmail.com"
     name = "Joshua Ferguson"
     pkey = "36CDF972E044DB6D68E3162DF92AFF72AFCE13A8"
     signkey = "92E1DBE0BCAB0361"
     hasGUI = {{ $hasGUI }}
+    isFedora = {{ $isFedora }}
+    isSilverblue = {{ $isSilverblue }}
+    authCmd = "{{ $AuthCmd }}"
+    pkgInstall = "{{ $pkgInstall }}"
