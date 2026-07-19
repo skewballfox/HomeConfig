@@ -17,6 +17,8 @@ packages:
     - nix
     - just
     - htop
+    - mlir
+    - mlir-devel
     - direnv
     - atuin
     - git-delta

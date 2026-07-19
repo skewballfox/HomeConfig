@@ -3,6 +3,7 @@
     type = "file"
     url = "https://raw.githubusercontent.com/drduh/YubiKey-Guide/master/config/gpg.conf"
     refreshPeriod = "168h"
+    private = true
 {{- if not .hasGUI }}
     filter.command = "sed"
     filter.args = ["-e", "s/use-agent/no-autostart/"]
