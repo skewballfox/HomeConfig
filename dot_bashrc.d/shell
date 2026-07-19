@@ -1,3 +1,4 @@
 export CARAPACE_BRIDGES='cobra,click,clap,kingpin,argcomplete,yargs'
 [ -x "$(command -v carapace)" ] && source <(carapace _carapace bash)
 [ -x "$(command -v atuin)" ] && source <(atuin init bash)
+[ -x "$(command -v direnv)" ] && source <(direnv hook bash)
