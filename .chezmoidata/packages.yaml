@@ -13,12 +13,12 @@ packages:
     - tailscale
     - fish
     - kitty-terminfo
+    - mlir
+    - mlir-devel
   dnf:
     - nix
     - just
     - htop
-    - mlir
-    - mlir-devel
     - direnv
     - atuin
     - git-delta
