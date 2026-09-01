@@ -16,9 +16,13 @@ set -e
           flatpak install --user -y {{- range .packages.flatpaks }} {{ . }} {{- end }}
 {{-     end }} 
 {{-   end }}
+  {{ .pkgInstall }} {{- range $pkgs }} {{ . }} {{- end }}
+{{- else if .isMac }}
+      brew install {{- range .packages.brew }} {{ . }} {{- end }}
+      brew install {{- range .packages.mac_brew }} {{ . }} {{- end }}
 {{- end }}
+
   
-{{ .pkgInstall }} {{- range $pkgs }} {{ . }} {{- end }}
 
 # uv tools (common to both)
 {{- range .packages.uv }}

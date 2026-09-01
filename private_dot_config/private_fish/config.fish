@@ -9,7 +9,9 @@ if status is-login
     # https://github.com/mozilla/grcov/#usage
     # set -gx RUSTFLAGS -Cinstrument-coverage
     set -gx XCURSOR_SIZE 16
-    set -gx EDITOR /usr/bin/hx
+    if command -q hx
+        set -gx EDITOR (which hx)
+    end
     set -gx KANI_HOME ~/.local/kani
     set -gx SDKMAN_DIR ~/.local/sdkman
     # pnpm

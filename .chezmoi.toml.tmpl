@@ -1,6 +1,15 @@
 {{- $hasGUI := promptBoolOnce . "hasGUI" "Does this machine have a GUI" }}
-{{- $isFedora := has .chezmoi.osRelease.id (list "fedora" "silverblue" "secureblue") }} 
-{{- $isSilverblue := has .chezmoi.osRelease.variant ( list "silverblue" "CoreOS") }} 
+{{- $isMac := eq .chezmoi.os "darwin" }}
+{{- $isFedora := false }}
+{{- $isSilverblue := false }}
+{{- if not $isMac }}
+{{-   if and (hasKey .chezmoi "osRelease") (hasKey .chezmoi.osRelease "id") }}
+{{-     $isFedora = has .chezmoi.osRelease.id (list "fedora" "silverblue" "secureblue") }} 
+{{-   end }}
+{{-   if and (hasKey .chezmoi "osRelease") (hasKey .chezmoi.osRelease "variant") }}
+{{-     $isSilverblue = has .chezmoi.osRelease.variant (list "silverblue" "CoreOS") }} 
+{{-   end }}
+{{- end }}
 {{- $AuthCmd := "sudo" }} 
 {{- $pkgInstall := cat $AuthCmd "dnf install -y" }} 
 {{- if $isSilverblue }} 
@@ -13,6 +22,7 @@
     pkey = "36CDF972E044DB6D68E3162DF92AFF72AFCE13A8"
     signkey = "92E1DBE0BCAB0361"
     hasGUI = {{ $hasGUI }}
+    isMac = {{ $isMac }}
     isFedora = {{ $isFedora }}
     isSilverblue = {{ $isSilverblue }}
     authCmd = "{{ $AuthCmd }}"

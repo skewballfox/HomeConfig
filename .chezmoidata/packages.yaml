@@ -33,6 +33,11 @@ packages:
     - carapace
     - yazi
     - git-delta
+  mac_brew:
+    - font-fira-code-nerd-font
+    - gopass
+    - gopass-jsonapi
+    - lgug2z/tap/komorebi-for-mac
   flatpaks:
     - com.github.tchx84.Flatseal
     - com.stremio.Stremio

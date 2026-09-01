@@ -10,7 +10,12 @@ git config --global user.email "{{ .email }}"
 git config --global user.name "{{ .name }}"
 git config --global commit.gpgsign true
 git config --global user.signingkey {{ .signkey }}
+{{- if .isMac }}
+git-credential-manager configure
+git config --global credential.helper manager
+{{- else }}
 git config --global credential.helper /usr/libexec/git-core/git-credential-libsecret
+{{- end }}
 git config --global init.defaultBranch main
 git config --global merge.conflictstyle zdiff3
 git config --global core.pager delta

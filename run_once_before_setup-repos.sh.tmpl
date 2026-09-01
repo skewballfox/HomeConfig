@@ -18,4 +18,10 @@ set -e
           {{ .pkgInstall }} fedora-workstation-repositories 
           {{ .authCmd }} dnf config-manager setopt google-chrome.enabled=1
     {{-     end }}
+{{- else if .isMac }}
+    # TODO: grab xcode somehow
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # TODO update path
+    brew tap dimentium/autoraise
+    brew trust dimentium/autoraise
 {{- end }}
