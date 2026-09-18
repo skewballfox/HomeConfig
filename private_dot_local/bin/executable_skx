@@ -1,0 +1,133 @@
+#!/usr/bin/env fish
+# skx: scan a skill with skill-scan before installing it via skillfish/skills.
+#
+# Wraps `npx <tool> add ...` so the skill gets a skillspector security scan
+# first. Only proceeds to the real `npx` install if skill-scan exits 0
+# (skillspector's own "risk score within threshold" signal). Anything else
+# (risky score, or the scan itself failing) aborts without installing.
+#
+# Usage:
+#   skx skills    add <repo-or-url> [--skill NAME] [scan flags] [-- skillspector-args...]
+#   skx skillfish add <owner/repo[/path]> [skill-name] [scan flags] [-- skillspector-args...]
+#
+# Scan flags are recognized directly (no `--` needed) and are forwarded to
+# skill-scan/skillspector only - they're stripped out before the real
+# `npx <tool> add` install command runs, since the installer doesn't know
+# them:
+#   --no-llm               static analysis only, skip the (slower) LLM pass
+#   --transitive           also scan external references the skill points to
+#   --transitive-depth N   max depth for --transitive (default 1)
+#   --fail-on-incomplete    treat an incomplete/partial scan as unsafe
+#   --verbose, -V           show detailed scan progress
+#
+# Anything after a literal `--` is passed through to `skillspector scan`
+# verbatim, for flags not exposed above (see `skillspector scan --help`).
+
+function _skx_usage
+    echo "Usage: skx <skills|skillfish> add <same args you'd give skill-scan> [scan flags]" >&2
+    echo "  scan flags: --no-llm --transitive --transitive-depth N --fail-on-incomplete --verbose" >&2
+    echo "  e.g. skx skillfish add somtougeh/somto-dev-toolkit biome-gritql --transitive" >&2
+    echo "       skx skills add https://github.com/ayghri/i-have-adhd --skill i-have-adhd --no-llm" >&2
+    echo "" >&2
+    echo "       skx completions fish   # print a fish completion script" >&2
+end
+
+function _skx_completions_fish
+    echo 'complete -c skx -f'
+    echo ''
+    echo '# skx <tool> <subcmd> ...'
+    echo "complete -c skx -n '__fish_use_subcommand' -a 'skills skillfish' -d 'installer to wrap'"
+    echo "complete -c skx -n '__fish_use_subcommand' -a 'completions' -d 'print a shell completion script'"
+    echo "complete -c skx -n '__fish_seen_subcommand_from completions' -a 'fish' -d 'print a fish completion script'"
+    echo "complete -c skx -n '__fish_seen_subcommand_from skills skillfish; and not __fish_seen_subcommand_from add' -a 'add' -d 'scan then install'"
+    echo ''
+    echo '# scan-only flags, forwarded to skill-scan/skillspector, stripped before install'
+    echo "complete -c skx -n '__fish_seen_subcommand_from add' -l no-llm -d 'static analysis only, skip LLM pass'"
+    echo "complete -c skx -n '__fish_seen_subcommand_from add' -l transitive -d 'also scan external references the skill points to'"
+    echo "complete -c skx -n '__fish_seen_subcommand_from add' -l transitive-depth -x -d 'max depth for --transitive (default 1)'"
+    echo "complete -c skx -n '__fish_seen_subcommand_from add' -l fail-on-incomplete -d 'treat an incomplete/partial scan as unsafe'"
+    echo "complete -c skx -n '__fish_seen_subcommand_from add' -l verbose -s V -d 'show detailed scan progress'"
+    echo ''
+    echo '# shared with the real installer: which skill within the repo'
+    echo "complete -c skx -n '__fish_seen_subcommand_from add' -l skill -s s -x -d 'skill name within the repo'"
+    echo "complete -c skx -n '__fish_seen_subcommand_from add' -l path -x -d 'explicit path to the skill within the repo'"
+end
+
+if test (count $argv) -ge 1 -a "$argv[1]" = "completions"
+    if test (count $argv) -eq 2 -a "$argv[2]" = "fish"
+        _skx_completions_fish
+        exit 0
+    else
+        echo "Error: skx completions only supports 'fish', got '$argv[2..-1]'" >&2
+        _skx_usage
+        exit 1
+    end
+end
+
+if test (count $argv) -lt 2
+    _skx_usage
+    exit 1
+end
+
+set -l tool $argv[1]
+set -l subcmd $argv[2]
+set -l rest $argv[3..-1]
+
+# Scan-only flags: relevant to vetting the skill, but meaningless to the
+# real installer, so they must never end up in $install_args below.
+set -l scan_only_flags --no-llm --transitive --fail-on-incomplete --verbose -V
+set -l scan_only_value_flags --transitive-depth
+
+# install_args = $rest, minus everything from a literal `--` onward (that's
+# skillspector-only passthrough) and minus any recognized scan-only flag
+# (and its value, if it takes one) wherever it appears.
+set -l install_args
+set -l n (count $rest)
+set -l i 1
+set -l saw_dashdash 0
+while test $i -le $n
+    set -l arg $rest[$i]
+    if test $saw_dashdash -eq 0
+        if test "$arg" = '--'
+            set saw_dashdash 1
+        else if contains -- "$arg" $scan_only_flags
+            # drop; forwarded to skill-scan only
+        else if contains -- "$arg" $scan_only_value_flags
+            set i (math $i + 1) # also drop its value
+        else if string match -q -- '--transitive-depth=*' $arg
+            # drop; value is inline
+        else
+            set install_args $install_args $arg
+        end
+    end
+    set i (math $i + 1)
+end
+
+if test "$tool" != "skills" -a "$tool" != "skillfish"
+    echo "Error: skx only wraps 'skills' or 'skillfish', got '$tool'" >&2
+    _skx_usage
+    exit 1
+end
+
+if test "$subcmd" != "add"
+    echo "Error: skx only wraps the 'add' subcommand, got '$subcmd'" >&2
+    _skx_usage
+    exit 1
+end
+
+echo "== skill-scan: scanning before install ==" >&2
+skill-scan $rest
+set -l scan_status $status
+echo "" >&2
+
+if test $scan_status -eq 0
+    echo "== skill-scan passed: risk score within threshold. Installing via \`npx $tool add\` ==" >&2
+    npx $tool add $install_args
+    exit $status
+else if test $scan_status -eq 1
+    echo "Refusing to install: skillspector flagged this skill's risk score above the safe threshold." >&2
+    exit 1
+else
+    echo "Refusing to install: skill-scan could not complete the scan (see output above)." >&2
+    exit $scan_status
+end

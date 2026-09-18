@@ -1,0 +1,272 @@
+#!/usr/bin/env bash
+#
+# git-sync-repo — safely bring a repo's default branch up to date
+# without touching your current branch or losing local changes.
+#
+# Usage: git-sync-repo [-u|--upstream] [--push] [path-to-repo]
+#
+#   -u, --upstream   Pull the default branch from the "upstream" remote
+#                    instead of "origin" (requires an "upstream" remote
+#                    to be configured; errors out otherwise).
+#   --push           After a successful --upstream pull, push the
+#                    updated default branch to "origin". Only valid
+#                    together with --upstream.
+#
+# Non-destructive guarantees:
+#   - Local changes (tracked + untracked) are stashed before anything
+#     else and re-applied at the end.
+#   - Uses `git pull --ff-only` on the default branch — if the local
+#     default branch has diverged from upstream (commits that aren't
+#     on origin), the script stops and tells you instead of merging
+#     or rebasing for you.
+#   - If restoring your stashed changes conflicts, the stash is left
+#     in the stash list (nothing is dropped); you're told to resolve
+#     it manually with `git stash pop` / `git stash drop`.
+#   - If you were on the default branch with uncommitted changes, those
+#     changes are moved onto an auto-named, uniquely-suffixed temporary
+#     branch (no prompt needed) for the duration of the sync. Once the
+#     stash is safely restored, the changes are folded back onto the
+#     default branch and the temporary branch is deleted. If any of
+#     that can't be done cleanly, the temporary branch and its changes
+#     are left in place instead of being discarded.
+
+set -uo pipefail
+
+die() {
+  echo "✗ $*" >&2
+  exit 1
+}
+
+info() {
+  echo "• $*"
+}
+
+UPSTREAM=0
+PUSH=0
+PUSH_FAILED=0
+REPO_PATH="."
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -u|--upstream)
+      UPSTREAM=1
+      shift
+      ;;
+    --push)
+      PUSH=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      die "Unknown option: $1"
+      ;;
+    *)
+      REPO_PATH="$1"
+      shift
+      ;;
+  esac
+done
+
+[ "$PUSH" = 1 ] && [ "$UPSTREAM" != 1 ] && die "--push can only be used with --upstream/-u"
+
+cd "$REPO_PATH" 2>/dev/null || die "Not a valid path: $REPO_PATH"
+
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+  || die "$REPO_PATH is not a git repository"
+
+REPO_NAME="$(basename "$(git rev-parse --show-toplevel)")"
+info "Syncing $REPO_NAME"
+
+# Bail out early on detached HEAD — nothing sane to "switch back to"
+ORIGINAL_BRANCH="$(git symbolic-ref --short -q HEAD)"
+if [ -z "$ORIGINAL_BRANCH" ]; then
+  die "HEAD is detached — checkout a branch first, refusing to guess"
+fi
+
+# Which remote to sync the default branch from: "origin" normally, or
+# "upstream" when --upstream/-u was given (and only if that remote
+# actually exists — we never silently fall back to origin here).
+if [ "$UPSTREAM" = 1 ]; then
+  git remote | grep -qx upstream || die "--upstream given but no 'upstream' remote is configured in $REPO_NAME"
+  PULL_REMOTE="upstream"
+else
+  PULL_REMOTE="origin"
+fi
+
+# Figure out the default branch from $PULL_REMOTE/HEAD, falling back to
+# main/master if $PULL_REMOTE/HEAD isn't set locally.
+DEFAULT_BRANCH="$(git symbolic-ref --short -q "refs/remotes/$PULL_REMOTE/HEAD" | sed "s#$PULL_REMOTE/##")"
+if [ -z "$DEFAULT_BRANCH" ]; then
+  for candidate in main master; do
+    if git show-ref --verify --quiet "refs/remotes/$PULL_REMOTE/$candidate"; then
+      DEFAULT_BRANCH="$candidate"
+      break
+    fi
+  done
+fi
+[ -n "$DEFAULT_BRANCH" ] || die "Couldn't determine default branch on $PULL_REMOTE (no $PULL_REMOTE/HEAD, no main/master)"
+
+info "Current branch: $ORIGINAL_BRANCH  |  Default branch: $DEFAULT_BRANCH"
+
+DIRTY=0
+if [ -n "$(git status --porcelain)" ]; then
+  DIRTY=1
+fi
+
+# If you're sitting on the default branch itself with uncommitted
+# changes, move them onto a fresh branch first. This doesn't remove
+# the need to stash below, but it means the stash gets popped back
+# onto a branch whose HEAD never moves (unlike main, which the pull
+# advances) — so the pop can't conflict with the incoming commits.
+# This branch only exists to hold the stash across the sync; once
+# the changes are safely restored we fold them back onto the (now
+# updated) default branch and delete it — see TEMP_STASH_BRANCH below.
+TEMP_STASH_BRANCH=""
+if [ "$ORIGINAL_BRANCH" = "$DEFAULT_BRANCH" ] && [ "$DIRTY" = 1 ]; then
+  echo
+  echo "You're on $DEFAULT_BRANCH with uncommitted changes in $REPO_NAME."
+  if [ -n "${GIT_SYNC_BRANCH_NAME:-}" ]; then
+    NEW_BRANCH="$GIT_SYNC_BRANCH_NAME"
+    unset GIT_SYNC_BRANCH_NAME  # only honor it once
+    git show-ref --verify --quiet "refs/heads/$NEW_BRANCH" \
+      && die "Branch '$NEW_BRANCH' (from GIT_SYNC_BRANCH_NAME) already exists"
+  else
+    # Timestamp + PID is unique enough on its own; the loop below is
+    # just a belt-and-suspenders guard so we never fail on a clash.
+    STAMP="$(date '+%Y%m%d-%H%M%S')-$$"
+    NEW_BRANCH="wip/${DEFAULT_BRANCH}-${STAMP}"
+    n=2
+    while git show-ref --verify --quiet "refs/heads/$NEW_BRANCH"; do
+      NEW_BRANCH="wip/${DEFAULT_BRANCH}-${STAMP}-${n}"
+      n=$((n + 1))
+    done
+  fi
+  git checkout -b "$NEW_BRANCH" >/dev/null 2>&1 \
+    || die "Couldn't create branch $NEW_BRANCH — aborting, $DEFAULT_BRANCH untouched"
+  info "Created and switched to $NEW_BRANCH to hold your changes"
+  ORIGINAL_BRANCH="$NEW_BRANCH"
+  TEMP_STASH_BRANCH="$NEW_BRANCH"
+fi
+
+# --- Stash local changes (tracked + untracked), if any ---
+STASHED=0
+if [ "$DIRTY" = 1 ]; then
+  STASH_MSG="git-sync-repo: $(date '+%Y-%m-%dT%H:%M:%S')"
+  if git stash push -u -m "$STASH_MSG" >/dev/null; then
+    STASHED=1
+    info "Stashed local changes ($STASH_MSG)"
+  else
+    die "Failed to stash local changes — aborting, nothing touched"
+  fi
+else
+  info "No local changes to stash"
+fi
+
+restore_branch() {
+  if [ "$(git symbolic-ref --short -q HEAD)" != "$ORIGINAL_BRANCH" ]; then
+    git checkout "$ORIGINAL_BRANCH" >/dev/null 2>&1
+  fi
+}
+
+stash_note() {
+  [ "$STASHED" = 1 ] && echo "  Your stashed changes are safe: run 'git stash list'." >&2
+}
+
+# --- Switch to default branch and pull ---
+if [ "$ORIGINAL_BRANCH" != "$DEFAULT_BRANCH" ]; then
+  if ! git checkout "$DEFAULT_BRANCH" >/dev/null 2>&1; then
+    restore_branch
+    echo "✗ Couldn't check out $DEFAULT_BRANCH — aborting." >&2
+    stash_note
+    exit 1
+  fi
+fi
+
+info "Pulling $DEFAULT_BRANCH from $PULL_REMOTE..."
+PULL_LOG="$(mktemp)"
+if [ "$UPSTREAM" = 1 ]; then
+  PULL_CMD=(git pull --ff-only "$PULL_REMOTE" "$DEFAULT_BRANCH")
+else
+  PULL_CMD=(git pull --ff-only)
+fi
+if ! "${PULL_CMD[@]}" >"$PULL_LOG" 2>&1; then
+  cat "$PULL_LOG" >&2
+  rm -f "$PULL_LOG"
+  restore_branch
+  echo >&2
+  echo "✗ $DEFAULT_BRANCH could not be fast-forwarded." >&2
+  echo "  This usually means $DEFAULT_BRANCH has local commits that aren't on $PULL_REMOTE." >&2
+  echo "  Nothing was changed — resolve this manually, then re-run." >&2
+  stash_note
+  exit 1
+fi
+rm -f "$PULL_LOG"
+
+if [ "$PUSH" = 1 ]; then
+  info "Pushing $DEFAULT_BRANCH to origin..."
+  PUSH_LOG="$(mktemp)"
+  if git push origin "$DEFAULT_BRANCH" >"$PUSH_LOG" 2>&1; then
+    rm -f "$PUSH_LOG"
+    info "Pushed $DEFAULT_BRANCH to origin"
+  else
+    cat "$PUSH_LOG" >&2
+    rm -f "$PUSH_LOG"
+    echo >&2
+    echo "✗ Pulled from $PULL_REMOTE, but pushing $DEFAULT_BRANCH to origin failed." >&2
+    echo "  $DEFAULT_BRANCH has the new commits locally; push manually with 'git push origin $DEFAULT_BRANCH'." >&2
+    PUSH_FAILED=1
+  fi
+fi
+
+# --- Switch back to original branch ---
+if [ "$ORIGINAL_BRANCH" != "$DEFAULT_BRANCH" ]; then
+  if ! git checkout "$ORIGINAL_BRANCH" >/dev/null 2>&1; then
+    echo "✗ Pulled $DEFAULT_BRANCH fine, but couldn't switch back to $ORIGINAL_BRANCH." >&2
+    stash_note
+    exit 1
+  fi
+fi
+
+# --- Restore stashed changes ---
+if [ "$STASHED" = 1 ]; then
+  POP_LOG="$(mktemp)"
+  if git stash pop >"$POP_LOG" 2>&1; then
+    rm -f "$POP_LOG"
+    info "Restored your local changes"
+
+    # If this branch only ever existed to hold the stash, fold the
+    # restored changes back onto the (now updated) default branch and
+    # drop the temporary branch. If anything here doesn't go cleanly,
+    # leave the branch and its changes in place rather than risk
+    # losing work.
+    if [ -n "$TEMP_STASH_BRANCH" ]; then
+      if git checkout "$DEFAULT_BRANCH" >/dev/null 2>&1; then
+        if git branch -d "$TEMP_STASH_BRANCH" >/dev/null 2>&1; then
+          info "Removed temporary branch $TEMP_STASH_BRANCH; your changes are now on $DEFAULT_BRANCH"
+          ORIGINAL_BRANCH="$DEFAULT_BRANCH"
+        else
+          echo "✗ Restored changes onto $DEFAULT_BRANCH but couldn't delete $TEMP_STASH_BRANCH (not fully merged) — leaving it in place." >&2
+          git checkout "$TEMP_STASH_BRANCH" >/dev/null 2>&1
+        fi
+      else
+        echo "✗ Couldn't switch to $DEFAULT_BRANCH to fold in changes from $TEMP_STASH_BRANCH — leaving them there." >&2
+      fi
+    fi
+  else
+    cat "$POP_LOG" >&2
+    rm -f "$POP_LOG"
+    echo >&2
+    echo "✗ Restoring your stashed changes conflicted with the update." >&2
+    echo "  Nothing was dropped — your stash is still in 'git stash list'." >&2
+    echo "  Resolve the conflict, then run 'git stash drop' once you're happy." >&2
+    exit 1
+  fi
+fi
+
+info "$REPO_NAME is up to date on $DEFAULT_BRANCH; you're back on $ORIGINAL_BRANCH"
+
+[ "$PUSH_FAILED" = 1 ] && exit 1
+exit 0

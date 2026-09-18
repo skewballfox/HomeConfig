@@ -30,14 +30,21 @@ packages:
     - htop
     - direnv
     - atuin
-    - carapace
     - yazi
-    - git-delta
+    - commitizen
+    - getgrit/tap/grit
+    - kargo
+    - gh
+    - tree
   mac_brew:
     - font-fira-code-nerd-font
     - gopass
     - gopass-jsonapi
+    - git-credential-manager
+    - autoraise
+    - jackielii/tap/skhd-zig
     - lgug2z/tap/komorebi-for-mac
+    - argocd
   flatpaks:
     - com.github.tchx84.Flatseal
     - com.stremio.Stremio
@@ -46,5 +53,10 @@ packages:
     - com.slack.Slack
     - org.zulip.Zulip
     - net.ankiweb.Anki
+  rust:
+    - sofka
+    - taws
+
   uv:
     - whisper-ctranslate2
+    - 'git+https://github.com/NVIDIA/skillspector.git'

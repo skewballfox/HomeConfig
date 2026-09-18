@@ -1,0 +1,238 @@
+#!/usr/bin/env fish
+# skill-scan: resolve a skill from a `skillfish add` / `skills add` command
+# and run skillspector's security scan on it.
+#
+# Accepts the same arguments you'd pass after `... add` to either tool:
+#   skill-scan owner/repo skill-name
+#   skill-scan owner/repo/plugin/skill
+#   skill-scan owner/repo --path path/to/skill
+#   skill-scan https://github.com/owner/repo --skill skill-name
+#
+# skillspector only knows how to `git clone` a bare repo URL or scan a local
+# directory - it can't fetch a GitHub subdirectory URL directly. So this
+# script clones the repo itself, tries to resolve the exact skill directory
+# (by folder name or SKILL.md frontmatter `name:`), and scans just that
+# directory. If it can't pin down an exact match but finds something close,
+# it falls back to scanning the whole repo with --recursive. If the skill
+# can't be found at all, it errors out instead of silently scanning.
+#
+# A handful of skillspector scan flags relevant to vetting a skill are
+# recognized directly (no `--` needed): --no-llm, --transitive,
+# --transitive-depth, --fail-on-incomplete, --verbose/-V. Anything else after
+# a literal `--` is passed through to `skillspector scan` verbatim.
+
+function _skill_scan_usage
+    echo "Usage: skill-scan <owner/repo[/path/to/skill]|repo-url> [skill-name] [--skill NAME] [--path PATH]" >&2
+    echo "                  [--no-llm] [--transitive] [--transitive-depth N] [--fail-on-incomplete] [--verbose]" >&2
+    echo "                  [-- skillspector-args...]" >&2
+end
+
+function _skill_scan_frontmatter_name --argument-names file
+    sed -n '/^---[[:space:]]*$/,/^---[[:space:]]*$/p' -- $file 2>/dev/null \
+        | grep -m1 -E '^name:' \
+        | sed -E 's/^name:[[:space:]]*//' \
+        | string trim -c '"\'' 2>/dev/null
+end
+
+# --- parse args -------------------------------------------------------
+
+set -l repo_ref ""
+set -l skill_name ""
+set -l explicit_path ""
+set -l scan_all 0
+set -l extra_args
+
+set -l n (count $argv)
+set -l i 1
+set -l saw_dashdash 0
+while test $i -le $n
+    set -l arg $argv[$i]
+    if test $saw_dashdash -eq 1
+        set extra_args $extra_args $arg
+        set i (math $i + 1)
+        continue
+    end
+    switch $arg
+        case '--'
+            set saw_dashdash 1
+        case '--skill' '-s' '--path'
+            set -l flag $arg
+            set i (math $i + 1)
+            if test $i -gt $n
+                echo "Error: $flag requires a value" >&2
+                exit 1
+            end
+            if test "$flag" = '--path'
+                set explicit_path $argv[$i]
+            else
+                set skill_name $argv[$i]
+            end
+        case '--skill=*'
+            set skill_name (string sub -s 9 -- $arg)
+        case '--path=*'
+            set explicit_path (string sub -s 8 -- $arg)
+        case '--all'
+            set scan_all 1
+        case '--no-llm' '--transitive' '--fail-on-incomplete'
+            set extra_args $extra_args $arg
+        case '--verbose' '-V'
+            set extra_args $extra_args '--verbose'
+        case '--transitive-depth'
+            set i (math $i + 1)
+            if test $i -gt $n
+                echo "Error: --transitive-depth requires a value" >&2
+                exit 1
+            end
+            set extra_args $extra_args '--transitive-depth' $argv[$i]
+        case '--transitive-depth=*'
+            set extra_args $extra_args '--transitive-depth' (string sub -s 20 -- $arg)
+        case '--agent' '-a' '--metadata' '--subagent'
+            set i (math $i + 1) # skip flag's value, irrelevant to scanning
+        case '-*'
+            # ignore other install-only flags: --force -y --yes --project
+            # --global -g --copy --json --full-depth etc.
+        case '*'
+            if test -z "$repo_ref"
+                set repo_ref $arg
+            else if test -z "$skill_name"
+                set skill_name $arg
+            end
+    end
+    set i (math $i + 1)
+end
+
+if test -z "$repo_ref"
+    _skill_scan_usage
+    exit 1
+end
+
+# --- resolve owner/repo/host/embedded-path -----------------------------
+
+set -l ref $repo_ref
+set -l host "github.com"
+
+if string match -qr '^(https?://|git@)' -- $ref
+    set -l m (string match -r '^https?://([^/]+)/(.*)$' -- $ref)
+    if test (count $m) -eq 3
+        set host $m[2]
+        set ref $m[3]
+    else
+        set -l m2 (string match -r '^git@([^:]+):(.*)$' -- $ref)
+        if test (count $m2) -eq 3
+            set host $m2[2]
+            set ref $m2[3]
+        end
+    end
+end
+
+set ref (string trim -c '/' -- $ref)
+set ref (string replace -r '\.git$' '' -- $ref)
+set -l parts (string split '/' -- $ref)
+
+if test (count $parts) -lt 2
+    echo "Error: could not parse owner/repo from '$repo_ref'" >&2
+    exit 1
+end
+
+set -l owner $parts[1]
+set -l repo $parts[2]
+set -l embedded_path ""
+if test (count $parts) -gt 2
+    set embedded_path (string join '/' -- $parts[3..-1])
+end
+
+if test -n "$embedded_path" -a -z "$explicit_path" -a -z "$skill_name"
+    set explicit_path $embedded_path
+end
+
+set -l repo_url "https://$host/$owner/$repo"
+
+# --- clone --------------------------------------------------------------
+
+set -l tmpdir (mktemp -d "$TMPDIR/skill-scan.XXXXXX" 2>/dev/null; or mktemp -d /tmp/skill-scan.XXXXXX)
+
+function _skill_scan_cleanup --on-process-exit %self --inherit-variable tmpdir
+    rm -rf $tmpdir
+end
+
+echo "Cloning $repo_url ..." >&2
+if not git clone --quiet --depth 1 -- $repo_url $tmpdir/repo
+    echo "Error: failed to clone $repo_url" >&2
+    exit 1
+end
+
+set -l repo_dir $tmpdir/repo
+
+# --- explicit path: no fallback, must exist ------------------------------
+
+if test -n "$explicit_path"
+    set -l target "$repo_dir/$explicit_path"
+    if not test -d $target
+        echo "Error: path '$explicit_path' not found in $owner/$repo" >&2
+        exit 1
+    end
+    if not test -f "$target/SKILL.md"
+        echo "Error: '$explicit_path' does not contain a SKILL.md" >&2
+        exit 1
+    end
+    echo "Resolved skill path: $owner/$repo/$explicit_path" >&2
+    skillspector scan $target $extra_args
+    exit $status
+end
+
+# --- no skill filter requested: scan everything --------------------------
+
+if test $scan_all -eq 1 -o -z "$skill_name"
+    echo "No specific skill given; scanning entire repository ($owner/$repo)." >&2
+    skillspector scan $repo_dir --recursive $extra_args
+    exit $status
+end
+
+# --- resolve skill by folder name or SKILL.md frontmatter name -----------
+
+set -l skill_files (find $repo_dir -iname SKILL.md)
+if test (count $skill_files) -eq 0
+    echo "Error: no SKILL.md files found in $owner/$repo" >&2
+    exit 1
+end
+
+set -l lname (string lower -- $skill_name)
+set -l exact_matches
+set -l fuzzy_matches
+
+for f in $skill_files
+    set -l dir (dirname $f)
+    set -l base (string lower -- (basename $dir))
+    set -l fname (_skill_scan_frontmatter_name $f)
+    set -l lfname (string lower -- "$fname")
+
+    if test "$base" = "$lname" -o "$lfname" = "$lname"
+        set exact_matches $exact_matches $dir
+    else if string match -q "*$lname*" -- $base; or string match -q "*$lname*" -- $lfname
+        set fuzzy_matches $fuzzy_matches $dir
+    end
+end
+
+if test (count $exact_matches) -eq 1
+    echo "Resolved skill '$skill_name' -> "(string replace "$repo_dir/" "$owner/$repo/" -- $exact_matches[1]) >&2
+    skillspector scan $exact_matches[1] $extra_args
+    exit $status
+else if test (count $exact_matches) -gt 1
+    echo "Error: skill name '$skill_name' matches multiple directories in $owner/$repo:" >&2
+    for d in $exact_matches
+        echo "  - "(string replace "$repo_dir/" "" -- $d) >&2
+    end
+    echo "Use --path to disambiguate." >&2
+    exit 1
+else if test (count $fuzzy_matches) -gt 0
+    echo "Warning: no exact match for skill '$skill_name'; falling back to scanning the entire repository." >&2
+    echo "Possible near-matches found:" >&2
+    for d in $fuzzy_matches
+        echo "  - "(string replace "$repo_dir/" "" -- $d) >&2
+    end
+    skillspector scan $repo_dir --recursive $extra_args
+    exit $status
+else
+    echo "Error: skill '$skill_name' not found in $owner/$repo" >&2
+    exit 1
+end

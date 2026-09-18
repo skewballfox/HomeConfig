@@ -1,5 +1,9 @@
 #!/bin/sh
 
+if command -v brew
+then
+    brew upgrade -y
+fi
 # update flatpak user packages
 if command -v flatpak
 then
