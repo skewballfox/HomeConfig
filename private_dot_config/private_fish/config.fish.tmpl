@@ -3,11 +3,14 @@ export PATH="$PATH:/Users/jf273/.docker/bin"
 # End of Docker Desktop section.
 
 if status is-interactive
-    set -x GPG_TTY (tty)
-    set -x SSH_AUTH_SOCK (gpgconf --list-dirs agent-ssh-socket)
+{{- if .isMac }}
     # backgrounded: the launch alone costs ~380ms
     gpgconf --launch gpg-agent &
     disown
+{{- else }}
+    set -x GPG_TTY (tty)
+{{- end }}
+    set -x SSH_AUTH_SOCK (gpgconf --list-dirs agent-ssh-socket)
 end
 
 if status is-login
