@@ -1,0 +1,3 @@
+{{ if not .isMac }}
+.local/bin/kre
+{{ end }}

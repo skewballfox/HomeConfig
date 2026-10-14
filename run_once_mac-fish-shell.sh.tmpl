@@ -1,0 +1,10 @@
+{{- if .isMac -}}
+#!/usr/bin/env bash
+# macOS refuses `chsh` to a shell that isn't in /etc/shells. Runs after
+# install-packages (fish is installed) and before setup.sh (which runs chsh).
+set -e
+FISH=/opt/homebrew/bin/fish
+if [ -x "$FISH" ] && ! grep -qx "$FISH" /etc/shells; then
+    echo "$FISH" | sudo tee -a /etc/shells >/dev/null
+fi
+{{- end }}

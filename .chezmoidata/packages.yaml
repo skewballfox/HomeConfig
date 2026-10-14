@@ -45,6 +45,11 @@ packages:
     - jackielii/tap/skhd-zig
     - lgug2z/tap/komorebi-for-mac
     - argocd
+    - fish
+    - gnupg
+    - pinentry-mac
+  mac_casks:
+    - scroll-reverser
   flatpaks:
     - com.github.tchx84.Flatseal
     - com.stremio.Stremio

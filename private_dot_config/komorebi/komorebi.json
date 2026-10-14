@@ -13,6 +13,10 @@
   "ignore_rules": [],
   "floating_applications": [],
   "manage_rules": [],
+  "display_index_preferences": {
+    "0": "4251086178",
+    "1": "0"
+  },
   "monitors": [
     {
       "workspaces": [
@@ -54,6 +58,30 @@
         {
           "name": "VIII",
           "layout": "Scrolling"
+        }
+      ]
+    },
+    {
+      // Portrait external display (27C1U-D, rotated 270)
+      "workspaces": [
+        {
+          "name": "A",
+          "layout": "HorizontalStack",
+          "initial_workspace_rules": [
+            { "kind": "Exe", "id": "Code", "matching_strategy": "Equals" }
+          ]
+        },
+        {
+          "name": "B",
+          "layout": "Rows",
+          "initial_workspace_rules": [
+            { "kind": "Exe", "id": "Claude", "matching_strategy": "Equals" },
+            { "kind": "Exe", "id": "1Password", "matching_strategy": "Equals" }
+          ]
+        },
+        {
+          "name": "C",
+          "layout": "BSP"
         }
       ]
     }

@@ -1,0 +1,24 @@
+{{- if .isMac -}}
+#!/usr/bin/env bash
+# macOS-only, one-time system fixes. Runs before files are applied, so before
+# run_once_setup.sh does `gpg --recv-keys` over hkps.
+set -e
+
+# NOTE: disabled. If you experience issues installing cert-manager with brew,
+# you may want to re-enable this to add the system root certificates to
+# /etc/ssl/cert.pem.
+#
+# gpg's dirmngr can't verify hkps keyservers against the stock /etc/ssl/cert.pem;
+# seed it with the system root certificates (keeping a backup).
+# if [ ! -e /etc/ssl/cert.pem.bak ]; then
+#     sudo cp /etc/ssl/cert.pem /etc/ssl/cert.pem.bak
+#     security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain \
+#         | sudo tee /etc/ssl/cert.pem >/dev/null
+#     gpgconf --reload dirmngr 2>/dev/null || true
+# fi
+
+# Rosetta, for the occasional x86_64-only tool
+if [ "$(uname -m)" = arm64 ] && ! /usr/bin/pgrep -q oahd; then
+    softwareupdate --install-rosetta --agree-to-license
+fi
+{{- end }}

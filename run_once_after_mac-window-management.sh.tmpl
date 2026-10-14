@@ -1,0 +1,32 @@
+{{- if .isMac -}}
+#!/usr/bin/env bash
+# macOS-only, one-time setup for the tiling/focus stack: komorebi, skhd, autoraise.
+# Runs after files are applied, so ~/.config/{komorebi,skhd} are already in place.
+set -e
+
+# skhd (jackielii/tap/skhd-zig) hotkeys; reads ~/.config/skhd/skhdrc
+if command -v skhd >/dev/null; then
+    [ -f ~/Library/LaunchAgents/com.koekeishiya.skhd.plist ] || skhd --install-service
+fi
+
+# autoraise (focus follows mouse), as a brew service
+if command -v autoraise >/dev/null; then
+    brew services start autoraise
+fi
+
+# komorebi (lgug2z/tap/komorebi-for-mac)
+if command -v komorebic >/dev/null; then
+{{- $email := get . "komorebiLicenseEmail" }}
+{{- if $email }}
+    komorebic license {{ $email | quote }}
+{{- end }}
+    # writes com.lgug2z.komorebi{,-bar}.plist into ~/Library/LaunchAgents
+    [ -f ~/Library/LaunchAgents/com.lgug2z.komorebi.plist ] || komorebic enable-autostart --bar
+fi
+
+cat <<'MSG'
+Window management: grant Accessibility (and Screen Recording for komorebi) in
+System Settings > Privacy & Security to skhd, komorebi and autoraise, then log
+out and back in (or run `komorebic start --bar`).
+MSG
+{{- end }}

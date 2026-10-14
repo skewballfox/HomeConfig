@@ -1,0 +1,43 @@
+{{- if .isMac -}}
+#!/usr/bin/env bash
+# macOS-only, one-time user preferences, set via `defaults` (the same things
+# System Settings writes). Meant to reproduce the current state on a new
+# machine, not to manage an existing one. Only machine-independent preferences
+# live here; per-machine ones (computer name, power schedule, display modes,
+# iCloud/account state) are deliberately left out.
+set -e
+
+# Appearance
+defaults write NSGlobalDomain AppleInterfaceStyle -string Dark
+defaults write NSGlobalDomain _HIHideMenuBar -bool true            # auto-hide the menu bar
+defaults write NSGlobalDomain AppleMiniaturizeOnDoubleClick -bool false
+
+# Trackpad: "natural" scrolling off
+defaults write NSGlobalDomain com.apple.swipescrolldirection -bool false
+
+# Dock
+defaults write com.apple.dock autohide -bool true
+defaults write com.apple.dock launchanim -bool false
+defaults write com.apple.dock tilesize -int 16
+defaults write com.apple.dock wvous-br-corner -int 14              # bottom-right hot corner: Quick Note
+defaults write com.apple.dock wvous-br-modifier -int 0
+
+# Window management: no tiled-window margins, hide desktop icons
+defaults write com.apple.WindowManager EnableTiledWindowMargins -bool false
+defaults write com.apple.WindowManager StandardHideDesktopIcons -bool true
+
+# Don't reopen apps/windows after logout or restart
+defaults write com.apple.loginwindow TALLogoutSavesState -bool false
+defaults write com.apple.loginwindow LoginwindowLaunchesRelaunchApps -bool false
+
+# Keyboard shortcuts: disable "Select previous input source" (^Space, ^⌥Space)
+# so those chords reach terminals and editors.
+defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 60 \
+    '<dict><key>enabled</key><false/><key>value</key><dict><key>type</key><string>standard</string><key>parameters</key><array><integer>32</integer><integer>49</integer><integer>262144</integer></array></dict></dict>'
+defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 61 \
+    '<dict><key>enabled</key><false/><key>value</key><dict><key>type</key><string>standard</string><key>parameters</key><array><integer>32</integer><integer>49</integer><integer>786432</integer></array></dict></dict>'
+/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u 2>/dev/null || true
+
+# Apply the Dock / window manager changes
+killall Dock 2>/dev/null || true
+{{- end }}

@@ -1,7 +1,13 @@
+# The following lines were added by Docker Desktop to add commands to your PATH.
+export PATH="$PATH:/Users/jf273/.docker/bin"
+# End of Docker Desktop section.
+
 if status is-interactive
     set -x GPG_TTY (tty)
     set -x SSH_AUTH_SOCK (gpgconf --list-dirs agent-ssh-socket)
-    gpgconf --launch gpg-agent
+    # backgrounded: the launch alone costs ~380ms
+    gpgconf --launch gpg-agent &
+    disown
 end
 
 if status is-login
@@ -15,7 +21,7 @@ if status is-login
     set -gx KANI_HOME ~/.local/kani
     set -gx SDKMAN_DIR ~/.local/sdkman
     # pnpm
-    set -gx PNPM_HOME "/home/skewballfox/.local/share/pnpm"
+    set -gx PNPM_HOME ~/.local/share/pnpm
     if not string match -q -- $PNPM_HOME $PATH
         set -gx PATH "$PNPM_HOME" $PATH
     end

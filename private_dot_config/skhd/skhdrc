@@ -57,6 +57,12 @@ alt - 7                 : komorebic focus-workspace 6
 alt - 8                 : komorebic focus-workspace 7
 alt - 9                 : komorebic focus-workspace 8
 
+# Monitors
+alt - m                 : komorebic cycle-monitor next
+alt + shift - m         : komorebic cycle-send-to-monitor next
+alt + ctrl - m          : komorebic cycle-move-workspace-to-monitor next
+alt + shift - o         : komorebic focus-monitor-at-cursor
+
 # Move windows across workspaces
 alt + shift - 1         : komorebic move-to-workspace 0
 alt + shift - 2         : komorebic move-to-workspace 1

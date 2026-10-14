@@ -1,0 +1,5 @@
+# yaml-language-server: $schema=https://carapace.sh/schema/command.json
+name: kargo
+description: Kargo CLI (cobra)
+completion:
+  positionalany: ["$carapace.bridge.Cobra([kargo])"]

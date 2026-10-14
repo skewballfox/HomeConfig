@@ -1,0 +1,11 @@
+{
+  "files.associations": {
+    "*.sh.tmpl": "shellscript",
+    "*.toml.tmpl": "toml",
+    "*.yaml.tmpl": "yaml",
+    "*.yml.tmpl": "yaml",
+    "*.json.tmpl": "jsonc",
+    "*.nu.tmpl": "nushell",
+    "**/private_dot_config/fish/**/*.tmpl": "fish"
+  }
+}

@@ -20,6 +20,7 @@ set -e
 {{- else if .isMac }}
       brew install {{- range .packages.brew }} {{ . }} {{- end }}
       brew install {{- range .packages.mac_brew }} {{ . }} {{- end }}
+      brew install --cask {{- range .packages.mac_casks }} {{ . }} {{- end }}
 {{- end }}
 
   

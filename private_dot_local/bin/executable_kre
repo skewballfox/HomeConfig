@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+#
+# kre — restart/reload komorebi and the services around it.
+#
+# Usage: kre [-H] [target...]
+#   targets: komorebi, bars, skhd, all (default)
+#   -H, --hard   restart skhd via launchd instead of only reloading its config
+#
+# Order matters: komorebi first, then wait until it answers, then the bars
+# (they exit on an empty `state` reply), then skhd.
+#
+# NOTE: komorebi (0.1.1) only answers commands while the active macOS Space
+# matches the one it saw when it started. With one Space per display the
+# active Space follows the cursor, so keep the cursor on the display you want
+# to stay responsive until this script finishes.
+
+set -u
+
+UID_N=$(id -u)
+KOMOREBI=com.lgug2z.komorebi
+BARS=(com.lgug2z.komorebi-bar com.lgug2z.komorebi-bar-external)
+SKHD=com.jackielii.skhd
+HARD=0
+TARGETS=()
+
+for arg in "$@"; do
+  case "$arg" in
+    -H | --hard) HARD=1 ;;
+    -h | --help) sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    komorebi | bars | skhd | all) TARGETS+=("$arg") ;;
+    *) echo "kre: unknown argument '$arg'" >&2; exit 2 ;;
+  esac
+done
+[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(all)
+
+want() {
+  local t
+  for t in "${TARGETS[@]}"; do [ "$t" = all ] || [ "$t" = "$1" ] && return 0; done
+  return 1
+}
+
+kick() { launchctl kickstart -k "gui/$UID_N/$1" && echo "restarted $1"; }
+
+# komorebic exits 0 with an empty reply when the daemon is not ready (or is
+# ignoring commands), so check the size of the reply, not the exit code.
+state_ok() { [ "$(komorebic state 2>/dev/null | wc -c | tr -d ' ')" -gt 1 ]; }
+
+wait_ready() {
+  local i nudged=0
+  for ((i = 0; i < 30; i++)); do
+    state_ok && { echo "komorebi is answering"; return 0; }
+    # Known quirk: after a restart the first reply can be empty until one
+    # command has been processed. Send exactly one, then keep polling.
+    if [ $nudged -eq 0 ] && [ $i -ge 6 ]; then
+      komorebic focus-workspace 0 >/dev/null 2>&1
+      nudged=1
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+if want komorebi; then
+  kick "$KOMOREBI"
+  if ! wait_ready; then
+    echo "kre: komorebi did not answer 'state' within 15s." >&2
+    echo "     Is the cursor on the display that was active when it started?" >&2
+    echo "     Skipping bars (they would exit on an empty reply)." >&2
+    SKIP_BARS=1
+  fi
+fi
+
+if want bars && [ "${SKIP_BARS:-0}" -eq 0 ]; then
+  for b in "${BARS[@]}"; do kick "$b"; done
+fi
+
+if want skhd; then
+  if [ $HARD -eq 1 ]; then
+    kick "$SKHD"
+  elif skhd -r >/dev/null 2>&1; then
+    echo "reloaded skhd config"
+  else
+    echo "kre: 'skhd -r' failed; try 'kre -H skhd'" >&2
+  fi
+fi
+
+[ "${SKIP_BARS:-0}" -eq 0 ]

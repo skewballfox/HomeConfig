@@ -1,5 +1,9 @@
 {{- $hasGUI := promptBoolOnce . "hasGUI" "Does this machine have a GUI" }}
 {{- $isMac := eq .chezmoi.os "darwin" }}
+{{- $komorebiEmail := "" }}
+{{- if $isMac }}
+{{-   $komorebiEmail = promptStringOnce . "komorebiLicenseEmail" "Email for 'komorebic license' (blank to skip)" "" }}
+{{- end }}
 {{- $isFedora := false }}
 {{- $isSilverblue := false }}
 {{- if not $isMac }}
@@ -23,6 +27,7 @@
     signkey = "92E1DBE0BCAB0361"
     hasGUI = {{ $hasGUI }}
     isMac = {{ $isMac }}
+    komorebiLicenseEmail = {{ $komorebiEmail | quote }}
     isFedora = {{ $isFedora }}
     isSilverblue = {{ $isSilverblue }}
     authCmd = "{{ $AuthCmd }}"
