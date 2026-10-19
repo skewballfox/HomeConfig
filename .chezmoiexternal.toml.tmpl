@@ -12,9 +12,17 @@
     type = "file"
     url = "https://raw.githubusercontent.com/drduh/YubiKey-Guide/master/config/gpg-agent.conf"
     refreshPeriod = "168h"
+    private = true
+{{- if not .isMac }}
+{{-   $pinentry := lookPath "pinentry" | default "/usr/bin/pinentry" }}
+    filter.command = "sed"
+{{-   $line := printf "pinentry-program %s" $pinentry }}
+    # uncomment the matching pinentry line, or append one if upstream drops it
+    filter.args = [
+        "-E",
+        "-e", '\|^[[:space:]]*(#[[:space:]]*)?pinentry-program[[:space:]]+{{ regexQuoteMeta $pinentry }}[[:space:]]*$| { s|.*|{{ $line }}|; h; }',
+        "-e", '$ { x; /^pinentry-program/ { x; b; }; x; a {{ $line }}',
+        "-e", '}',
+    ]
 {{- end }}
-["tmp/ble-nightly"]
-    type = "archive"
-    url = "https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-nightly.tar.xz"
-    refreshPeriod = "168h"
-    stripComponents = 1
+{{- end }}

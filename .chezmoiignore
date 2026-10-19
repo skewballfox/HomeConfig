@@ -1,3 +1,5 @@
 {{ if not .isMac }}
 .local/bin/kre
+Library
+Library/**
 {{ end }}
