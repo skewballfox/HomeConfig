@@ -21,4 +21,32 @@ set -e
 if [ "$(uname -m)" = arm64 ] && ! /usr/bin/pgrep -q oahd; then
     softwareupdate --install-rosetta --agree-to-license
 fi
+
+# nushell on macOS ignores XDG_CONFIG_HOME set from its own config, so set it
+# for the whole GUI session via a LaunchAgent (survives reboots), and apply it
+# to the running session now.
+agent=~/Library/LaunchAgents/org.xdg.config-home.plist
+mkdir -p "$(dirname "$agent")"
+plist="$(cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.xdg.config-home</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/launchctl</string>
+        <string>setenv</string>
+        <string>XDG_CONFIG_HOME</string>
+        <string>$HOME/.config</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+PLIST
+)"
+[ "$(cat "$agent" 2>/dev/null)" = "$plist" ] || printf '%s\n' "$plist" >"$agent"
+[ "$(launchctl getenv XDG_CONFIG_HOME)" = "$HOME/.config" ] || launchctl setenv XDG_CONFIG_HOME "$HOME/.config"
 {{- end }}

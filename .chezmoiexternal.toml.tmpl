@@ -13,7 +13,15 @@
     url = "https://raw.githubusercontent.com/drduh/YubiKey-Guide/master/config/gpg-agent.conf"
     refreshPeriod = "168h"
     private = true
-{{- if not .isMac }}
+{{- if .isMac }}
+{{-   $pinentry := lookPath "pinentry-mac" | default "/opt/homebrew/bin/pinentry-mac" }}
+    filter.command = "sed"
+    # uncomment the matching pinentry line (BSD sed can't do the one-line append below)
+    filter.args = [
+        "-E",
+        "-e", 's|^[[:space:]]*#[[:space:]]*(pinentry-program[[:space:]]+{{ regexQuoteMeta $pinentry }})[[:space:]]*$|\1|',
+    ]
+{{- else }}
 {{-   $pinentry := lookPath "pinentry" | default "/usr/bin/pinentry" }}
     filter.command = "sed"
 {{-   $line := printf "pinentry-program %s" $pinentry }}

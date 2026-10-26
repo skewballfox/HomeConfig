@@ -1,0 +1,4 @@
+models:
+  "haiku":
+    context_length: 200000
+    max_output_tokens: 8192

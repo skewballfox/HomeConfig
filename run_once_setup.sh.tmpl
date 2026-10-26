@@ -3,7 +3,7 @@ set -e
 KEYID={{ .pkey }}
 mkdir -p ~/.{gnupg,ssh}
 chmod 700 ~/.{gnupg,ssh}
-gpg --recv-keys --keyserver hkps://keys.openpgp.org $KEYID
+gpg --list-keys "$KEYID" >/dev/null 2>&1 || gpg --recv-keys --keyserver hkps://keys.openpgp.org $KEYID
 echo "${KEYID}:6:" | gpg --import-ownertrust
 
 git config --global user.email "{{ .email }}"
@@ -11,10 +11,9 @@ git config --global user.name "{{ .name }}"
 git config --global commit.gpgsign true
 git config --global user.signingkey {{ .signkey }}
 {{- if .isMac }}
-git-credential-manager configure
-git config --global credential.helper manager
+git config --global --get-all credential.helper | grep -q git-credential-manager || git-credential-manager configure
 {{- else }}
-git config --global credential.helper /usr/libexec/git-core/git-credential-libsecret
+git config --global --replace-all credential.helper /usr/libexec/git-core/git-credential-libsecret
 {{- end }}
 git config --global init.defaultBranch main
 git config --global merge.conflictstyle zdiff3
@@ -38,5 +37,6 @@ git config --global filter.lfs.process "git-lfs filter-process"
 mkdir -p ~/Workspace ~/Media/{Video,Audio/Music,Documents,Images,VM}
 rmdir -p  ~/{Pictures,Music,Videos,Documents} 2>/dev/null || true
 
-[ -x "$(command -v fish)" ] && chsh -s "$(command -v fish)" "$(whoami)" || true
+fish="$(command -v fish || true)"
+[ -x "$fish" ] && [ "$SHELL" != "$fish" ] && chsh -s "$fish" "$(whoami)" || true
 gpg --export-ssh-key 36CDF972E044DB6D68E3162DF92AFF72AFCE13A8 > ~/.ssh/yubikey.pub

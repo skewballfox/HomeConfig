@@ -11,14 +11,16 @@ fi
 
 # autoraise (focus follows mouse), as a brew service
 if command -v autoraise >/dev/null; then
-    brew services start autoraise
+    brew services list | grep -q '^autoraise[[:space:]]*started' || brew services start autoraise
 fi
 
 # komorebi (lgug2z/tap/komorebi-for-mac)
 if command -v komorebic >/dev/null; then
 {{- $email := get . "komorebiLicenseEmail" }}
 {{- if $email }}
-    komorebic license {{ $email | quote }}
+    # komorebi records the licensed email in this file (no trailing newline)
+    [ "$(cat ~/Library/Application\ Support/komorebi/icul 2>/dev/null)" = {{ $email | quote }} ] \
+        || komorebic license {{ $email | quote }}
 {{- end }}
     # writes com.lgug2z.komorebi{,-bar}.plist into ~/Library/LaunchAgents
     [ -f ~/Library/LaunchAgents/com.lgug2z.komorebi.plist ] || komorebic enable-autostart --bar

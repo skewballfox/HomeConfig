@@ -1,27 +1,33 @@
 #!/usr/bin/env bash
 set -e
 {{- if .isFedora }}
-    # On all rpm variants
-    {{ .authCmd }} curl -fsSL https://pkgs.tailscale.com/stable/fedora/tailscale.repo -o /etc/yum.repos.d/tailscale.repo
-    {{-   if not .isSilverblue }}
-        {{ .pkgInstall }} https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-        {{ .pkgInstall }} https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
-    {{-   end }}
-    {{-     if .hasGUI }}
-          # GUI packages
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak --user update -y
-          # VS Code repo
-          {{ .authCmd }} rpm --import https://packages.microsoft.com/keys/microsoft.asc 
-          printf '[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\nautorefresh=1\ntype=rpm-md\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc\n' \
-            | {{ .authCmd }} tee /etc/yum.repos.d/vscode.repo > /dev/null
-          {{ .pkgInstall }} fedora-workstation-repositories 
-          {{ .authCmd }} dnf config-manager setopt google-chrome.enabled=1
-    {{-     end }}
+# On all rpm variants
+[ -f /etc/yum.repos.d/tailscale.repo ] || {{ .authCmd }} curl -fsSL https://pkgs.tailscale.com/stable/fedora/tailscale.repo -o /etc/yum.repos.d/tailscale.repo
+{{-   if not .isSilverblue }}
+rpm -q rpmfusion-nonfree-release >/dev/null || {{ .pkgInstall }} https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+rpm -q rpmfusion-free-release >/dev/null || {{ .pkgInstall }} https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
+{{-   end }}
+{{-   if .hasGUI }}
+# GUI packages
+flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak --user update -y
+# VS Code repo
+if [ ! -f /etc/yum.repos.d/vscode.repo ]; then
+{{ .authCmd }} rpm --import https://packages.microsoft.com/keys/microsoft.asc
+printf '[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\nautorefresh=1\ntype=rpm-md\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc\n' \
+  | {{ .authCmd }} tee /etc/yum.repos.d/vscode.repo > /dev/null
+fi
+rpm -q fedora-workstation-repositories >/dev/null || {{ .pkgInstall }} fedora-workstation-repositories
+{{ .authCmd }} dnf config-manager setopt google-chrome.enabled=1
+{{-   end }}
 {{- else if .isMac }}
-    # TODO: grab xcode somehow
+# TODO: grab xcode somehow
+if ! command -v brew >/dev/null 2>&1 && [ ! -x /opt/homebrew/bin/brew ]; then
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # TODO update path
+fi
+# TODO update path
+if ! brew tap | grep -qx dimentium/autoraise; then
     brew tap dimentium/autoraise
     brew trust dimentium/autoraise
+fi
 {{- end }}

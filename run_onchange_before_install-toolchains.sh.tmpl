@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -e
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
+
 # Install rustup
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+command -v rustup >/dev/null || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
 rustup component add rust-analyzer
 rustup target add{{ range .packages.rustup_targets }} {{ . }}{{ end }}
@@ -9,9 +11,9 @@ rustup target add{{ range .packages.rustup_targets }} {{ . }}{{ end }}
 rustup toolchain install nightly --profile minimal --component rust-src
 
 # Install cargo-binstall
-curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-cargo install cargo-update
+command -v cargo-binstall >/dev/null || curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+command -v cargo-install-update >/dev/null || cargo install cargo-update
 cargo binstall -y{{ range .packages.cargo }} {{ . }}{{ end }}
 
 # Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
+command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh

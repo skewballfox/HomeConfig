@@ -10,8 +10,8 @@ if (which hx | is-not-empty) {
 $env.KANI_HOME = ($env.HOME | path join .local kani)
 $env.SDKMAN_DIR = ($env.HOME | path join .local sdkman)
 
+use std/util "path add"
+
 # pnpm
 $env.PNPM_HOME = ($env.HOME | path join .local share pnpm)
-if $env.PNPM_HOME not-in $env.PATH {
-    $env.PATH = ($env.PATH | prepend $env.PNPM_HOME)
-}
+path add $env.PNPM_HOME
