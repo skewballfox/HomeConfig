@@ -1,0 +1,15 @@
+[Unit]
+Description=Evict cargo artifacts and download caches unused for a week
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.cargo/bin:/usr/local/bin:/usr/bin
+# The anchor crate only gives cargo-sweep a manifest; CARGO_TARGET_DIR picks the dir.
+Environment=ANCHOR=%h/.local/share/cargo-sweep/anchor
+ExecStart=/usr/bin/env CARGO_TARGET_DIR=%h/.cache/cargo-target cargo sweep --time 7 ${ANCHOR}
+ExecStart=/usr/bin/env CARGO_TARGET_DIR=%h/.cache/rust-analyzer-target cargo sweep --time 7 ${ANCHOR}
+ExecStart=/usr/bin/env CARGO_TARGET_DIR=%h/.cache/cargo-target cargo sweep --installed ${ANCHOR}
+ExecStart=%h/.cargo/bin/cargo +nightly -Zgc clean gc --max-download-age=1week
+Nice=19
+IOSchedulingClass=idle
+IOWeight=10

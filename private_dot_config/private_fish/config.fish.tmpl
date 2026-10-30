@@ -30,3 +30,6 @@ if status is-login
     end
 
 end
+
+# Last so it beats rustup's, brew's and pnpm's prepends; --move dedupes.
+fish_add_path --move --path ~/.local/bin

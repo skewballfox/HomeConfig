@@ -3,10 +3,15 @@ set -e
 # Install rustup
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
+rustup component add rust-analyzer
+rustup target add{{ range .packages.rustup_targets }} {{ . }}{{ end }}
+# eBPF (bpfel-unknown-none) is tier 3: no prebuilt target, built with nightly + build-std
+rustup toolchain install nightly --profile minimal --component rust-src
 
 # Install cargo-binstall
 curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
 cargo install cargo-update
+cargo binstall -y{{ range .packages.cargo }} {{ . }}{{ end }}
 
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh

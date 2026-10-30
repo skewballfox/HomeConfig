@@ -1,0 +1,4 @@
+#!/bin/sh
+# Linker driver for cargo: system cc, linking with wild. -fuse-ld goes last so
+# it overrides the -fuse-ld=lld rustc adds for its self-contained rust-lld.
+exec cc "$@" -fuse-ld=wild

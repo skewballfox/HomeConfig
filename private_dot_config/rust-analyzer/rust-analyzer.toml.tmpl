@@ -1,0 +1,21 @@
+{{- /* systemd-run and the paths are Linux-only; macOS reads ~/Library anyway. */ -}}
+{{ if not .isMac -}}
+# User-level rust-analyzer config, applied to every workspace.
+
+# Own target dir, so flycheck never contends with terminal builds for
+# ~/.cache/cargo-target's lock or invalidates its fingerprints.
+cargo.targetDir = "{{ .chezmoi.homeDir }}/.cache/rust-analyzer-target"
+
+# Keep debug info for build scripts and proc-macros out of the linked outputs.
+cargo.extraEnv = { CARGO_PROFILE_DEV_SPLIT_DEBUGINFO = "unpacked" }
+check.extraEnv = { CARGO_PROFILE_DEV_SPLIT_DEBUGINFO = "unpacked" }
+
+# Run flycheck at low CPU and IO priority so it yields to builds and the desktop.
+# An override command gets no flags from rust-analyzer, so the target dir is
+# passed explicitly.
+check.overrideCommand = [
+    "systemd-run", "--user", "--scope", "--quiet", "-p", "CPUWeight=20", "-p", "IOWeight=20",
+    "cargo", "check", "--workspace", "--all-targets", "--message-format=json",
+    "--target-dir", "{{ .chezmoi.homeDir }}/.cache/rust-analyzer-target",
+]
+{{ end -}}

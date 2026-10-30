@@ -36,6 +36,7 @@ packages:
     - kargo
     - gh
     - tree
+    - wild
   mac_brew:
     - font-fira-code-nerd-font
     - gopass
@@ -58,9 +59,20 @@ packages:
     - com.slack.Slack
     - org.zulip.Zulip
     - net.ankiweb.Anki
-  rust:
+  cargo:
+    - cargo-sweep
     - sofka
     - taws
+    - bpf-linker
+  rustup_targets:
+    # wasm
+    - wasm32-unknown-unknown
+    - wasm32-wasip1
+    # android
+    - aarch64-linux-android
+    - armv7-linux-androideabi
+    - i686-linux-android
+    - x86_64-linux-android
 
   uv:
     - whisper-ctranslate2

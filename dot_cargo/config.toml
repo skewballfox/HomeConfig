@@ -1,0 +1,15 @@
+# Link host builds with wild. Set as `linker` rather than target rustflags,
+# because target rustflags would silently replace any project's build.rustflags.
+[target.x86_64-unknown-linux-gnu]
+# Relative to the directory holding .cargo/, i.e. $HOME.
+linker = ".local/bin/cc-wild"
+
+# Line tables keep backtraces and breakpoints but cut link memory and target-dir
+# size sharply. Config-file profiles override each project's Cargo.toml.
+[profile.dev]
+debug = "line-tables-only"
+
+# Full debug info for debugger sessions: cargo build --profile debugging
+[profile.debugging]
+inherits = "dev"
+debug = "full"
