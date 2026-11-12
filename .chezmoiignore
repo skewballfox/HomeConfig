@@ -1,3 +1,10 @@
+CLAUDE.md
+{{ if or .isMac (not .hasGUI) }}
+.config/systemd/user/yubikey-touch-detector.service
+{{ end }}
+{{ if not .hasGUI }}
+Library/LaunchAgents/com.github.maximbaz.yubikey-touch-detector.plist
+{{ end }}
 {{ if not .isMac }}
 .local/bin/kre
 Library

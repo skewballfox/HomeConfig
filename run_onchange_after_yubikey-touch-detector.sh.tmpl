@@ -1,0 +1,16 @@
+{{- if .hasGUI -}}
+#!/usr/bin/env bash
+# (re)start the service when the pinned release changes: {{ .yubikeyTouchDetector.version }}
+set -euo pipefail
+
+{{ if .isMac -}}
+label=com.github.maximbaz.yubikey-touch-detector
+plist=~/Library/LaunchAgents/$label.plist
+launchctl bootout "gui/$UID/$label" 2>/dev/null || true
+launchctl bootstrap "gui/$UID" "$plist"
+{{- else -}}
+systemctl --user daemon-reload
+systemctl --user enable yubikey-touch-detector.service
+systemctl --user restart yubikey-touch-detector.service
+{{- end }}
+{{- end }}

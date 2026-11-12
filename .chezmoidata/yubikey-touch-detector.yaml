@@ -1,0 +1,10 @@
+# Bump together: version + the matching SHA256SUMS entries from the release page.
+# Release binaries are not signed, only the source tarballs are (key 56C3E775E72B0C8B1C0C1BD0B5DB77409B11B601),
+# so these pins are the integrity check.
+yubikeyTouchDetector:
+  version: "1.15.0"
+  sha256:
+    darwin-arm64: a5b918131647def0d37531932d4b91e3bbd5e40e55ab9ee5237edc5940b88e4b
+    darwin-amd64: 1230a5c5a384fad957db80295ebf5d469bcd2da15802290b7a79c4ab864ad66e
+    linux-arm64: 9054ed98744616d39ee51d739551483a0421f3299e7fa0d4c73f1297896fcbbc
+    linux-amd64: 4b35548dafc0c214544d83117800521db7348b3e9ba2e17cf40461779bbd4390

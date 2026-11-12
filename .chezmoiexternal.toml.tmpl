@@ -34,3 +34,16 @@
     ]
 {{- end }}
 {{- end }}
+{{- if .hasGUI }}
+{{-   $ytd := .yubikeyTouchDetector }}
+{{-   $target := printf "%s-%s" .chezmoi.os .chezmoi.arch }}
+{{-   $triple := dict "darwin-arm64" "aarch64-darwin" "darwin-amd64" "x86_64-darwin" "linux-arm64" "aarch64-linux-gnu" "linux-amd64" "x86_64-linux-gnu" }}
+{{-   if hasKey $ytd.sha256 $target }}
+
+[".local/bin/yubikey-touch-detector"]
+    type = "file"
+    url = "https://github.com/maximbaz/yubikey-touch-detector/releases/download/{{ $ytd.version }}/yubikey-touch-detector-{{ index $triple $target }}"
+    executable = true
+    checksum.sha256 = "{{ index $ytd.sha256 $target }}"
+{{-   end }}
+{{- end }}

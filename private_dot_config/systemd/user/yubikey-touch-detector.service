@@ -1,0 +1,9 @@
+[Unit]
+Description=Detects when your YubiKey is waiting for a touch
+
+[Service]
+ExecStart=%h/.local/bin/yubikey-touch-detector --notify
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

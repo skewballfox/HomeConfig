@@ -4,6 +4,10 @@ font_family FiraCode
 map ctrl+c copy_or_interrupt
 map ctrl+v paste_from_clipboard
 map kitty_mod+enter launch --cwd=current
+{{- if .isMac }}
+
+macos_option_as_alt left
+{{- end }}
 
 # no title bar (tiling WM)
 hide_window_decorations titlebar-and-corners

@@ -13,6 +13,7 @@ packages:
     - tailscale
     - fish
     - kitty-terminfo
+    - nushell
     - mlir
     - mlir-devel
   dnf:
@@ -37,6 +38,7 @@ packages:
     - gh
     - tree
     - wild
+    - nushell
   mac_brew:
     - font-fira-code-nerd-font
     - gopass
