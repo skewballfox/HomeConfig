@@ -13,7 +13,6 @@ packages:
     - tailscale
     - fish
     - kitty-terminfo
-    - nushell
     - mlir
     - mlir-devel
   dnf:
