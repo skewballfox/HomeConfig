@@ -27,5 +27,5 @@ set -e
 
 # uv tools (common to both)
 {{- range .packages.uv }}
-"$HOME"/.local/bin/uv tool install {{ . }}
+"$HOME"/.local/bin/uv tool install {{ . | quote }}
 {{- end }}

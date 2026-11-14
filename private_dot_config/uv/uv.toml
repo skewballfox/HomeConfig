@@ -1,0 +1,4 @@
+# Only use uv-managed Pythons. Tool venvs built on the system python3 break
+# on Fedora major upgrades, when /usr/bin/python3 moves to a new minor version
+# underneath them.
+python-preference = "only-managed"

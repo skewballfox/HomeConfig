@@ -33,3 +33,15 @@ end
 
 # Last so it beats rustup's, brew's and pnpm's prepends; --move dedupes.
 fish_add_path --move --path ~/.local/bin
+
+# The brew-proxy package (/usr/share/fish/vendor_conf.d/brew-proxy.fish) sets XDG_DATA_DIRS to a
+# list without `--path`, so fish exports the entries joined by spaces and the Vulkan loader finds
+# no ICD under /usr/share/vulkan/icd.d. User conf.d runs before the vendor snippets, so the repair
+# has to live here. Remove it when the package is fixed.
+if set -q XDG_DATA_DIRS; and string match -q -- '* *' "$XDG_DATA_DIRS"
+    set -l dirs
+    for dir in (string split -n -- ' ' (string replace -a : ' ' -- "$XDG_DATA_DIRS"))
+        contains -- $dir $dirs; or set -a dirs $dir
+    end
+    set -gx --path XDG_DATA_DIRS $dirs
+end
