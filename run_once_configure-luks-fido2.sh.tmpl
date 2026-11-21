@@ -1,0 +1,99 @@
+{{- if and .hasGUI (ne .chezmoi.os "darwin") -}}
+#!/usr/bin/env bash
+# Enroll a FIDO2 key in every LUKS volume and make sure /etc/crypttab uses it.
+# Idempotent: each step checks the current state before changing anything.
+set -euo pipefail
+
+if ! command -v lsblk >/dev/null 2>&1 || ! command -v systemd-cryptenroll >/dev/null 2>&1; then
+  echo "luks-fido2: lsblk or systemd-cryptenroll not found, skipping" >&2
+  exit 0
+fi
+
+# Options to add to crypttab. The workqueue bypass only makes sense with AES
+# hardware support, so only add it when the CPU reports the aes flag.
+want="fido2-device=auto"
+if grep -qw aes /proc/cpuinfo; then
+  want="$want,no-read-workqueue,no-write-workqueue"
+fi
+
+mapfile -t luks_devs < <(lsblk -rpno NAME,FSTYPE | awk '$2 == "crypto_LUKS" { print $1 }')
+if [ "${#luks_devs[@]}" -eq 0 ]; then
+  echo "luks-fido2: no LUKS volumes found, skipping" >&2
+  exit 0
+fi
+
+# Only FIDO2 HID nodes count. TPM nodes (/dev/tpm*) are never considered.
+# awk reads all input instead of exiting early: an early exit can SIGPIPE
+# systemd-cryptenroll, and with pipefail that kills the script with status 141.
+fido2_device() {
+  systemd-cryptenroll --fido2-device=list 2>/dev/null \
+    | awk '!found && $1 ~ /^\/dev\/hidraw[0-9]+$/ { print $1; found = 1 }'
+}
+
+enroll() {
+  local fido_dev
+  fido_dev="$(fido2_device)"
+  echo "luks-fido2: enrolling FIDO2 key $fido_dev for $1"
+  sudo systemd-cryptenroll "$1" \
+    --fido2-device="$fido_dev" \
+    --fido2-with-client-pin=no \
+    --fido2-with-user-presence=yes
+}
+
+update_crypttab() {
+  local dev="$1" uuid="$2" tmp
+  tmp="$(mktemp)"
+  sudo awk -v uuid="$uuid" -v dev="$dev" -v want="$want" '
+    function keyof(s) { sub(/=.*/, "", s); return s }
+    /^[[:space:]]*(#|$)/ { print; next }
+    ($2 == "UUID=" uuid || $2 == dev) {
+      found = 1
+      if (NF < 3) $3 = "none"
+      opts = (NF >= 4) ? $4 : ""
+      n = split(want, w, ",")
+      for (i = 1; i <= n; i++) {
+        present = 0
+        m = split(opts, cur, ",")
+        for (j = 1; j <= m; j++) if (keyof(cur[j]) == keyof(w[i])) present = 1
+        if (!present) opts = (opts == "" ? w[i] : opts "," w[i])
+      }
+      $4 = opts
+      print
+      next
+    }
+    { print }
+    END { if (!found) print "luks-fido2: no crypttab entry for " dev > "/dev/stderr" }
+  ' /etc/crypttab > "$tmp"
+
+  if ! sudo cmp -s "$tmp" /etc/crypttab; then
+    sudo cp -a /etc/crypttab /etc/crypttab.chezmoi-bak
+    sudo install -m 0644 -o root -g root "$tmp" /etc/crypttab
+    echo "luks-fido2: updated /etc/crypttab for $dev (backup: /etc/crypttab.chezmoi-bak)"
+  fi
+  rm -f "$tmp"
+}
+
+status=0
+for dev in "${luks_devs[@]}"; do
+  # Capture the slot list first. Piping into grep -q could SIGPIPE the lister,
+  # which would read as "not enrolled" and add a duplicate fido2 slot.
+  if ! slots="$(sudo systemd-cryptenroll "$dev")"; then
+    echo "luks-fido2: cannot read LUKS slots on $dev, skipping" >&2
+    status=1
+    continue
+  fi
+  if ! grep -qw fido2 <<<"$slots"; then
+    if [ -n "$(fido2_device)" ]; then
+      if ! enroll "$dev"; then
+        echo "luks-fido2: enrollment failed for $dev" >&2
+        status=1
+      fi
+    else
+      echo "luks-fido2: no FIDO2 device plugged in, not enrolling $dev" >&2
+    fi
+  fi
+  uuid="$(sudo blkid -s UUID -o value "$dev")"
+  update_crypttab "$dev" "$uuid"
+done
+exit "$status"
+{{- end }}

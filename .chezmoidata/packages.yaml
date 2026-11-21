@@ -9,6 +9,8 @@ packages:
       - gopass
       - gnupg2-scdaemon
       - gnupg2-gpg-agent
+      # libgpgme.so.11 for the pinned yubikey-touch-detector release
+      - compat-gpgme124
   rpm:
     - tailscale
     - fish
@@ -77,6 +79,7 @@ packages:
 
   uv:
     # floor: fail loudly instead of backtracking to ancient builds when a new
-    # Python lacks wheels (e.g. onnxruntime)
-    - 'whisper-ctranslate2>=0.5'
+    # Python lacks wheels. onnxruntime has no cp315 wheels yet, so pin 3.14.
+    - spec: 'whisper-ctranslate2>=0.5'
+      python: '3.14'
     - 'git+https://github.com/NVIDIA/skillspector.git'

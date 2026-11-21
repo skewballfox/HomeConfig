@@ -27,5 +27,9 @@ set -e
 
 # uv tools (common to both)
 {{- range .packages.uv }}
+{{- if kindIs "map" . }}
+"$HOME"/.local/bin/uv tool install --python {{ .python | quote }} {{ .spec | quote }}
+{{- else }}
 "$HOME"/.local/bin/uv tool install {{ . | quote }}
+{{- end }}
 {{- end }}

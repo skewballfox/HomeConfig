@@ -1,0 +1,18 @@
+{{- if and .hasGUI (eq .chezmoi.os "linux") -}}
+#!/usr/bin/env bash
+# Mask GCR's ssh-agent wrapper so gpg-agent (YubiKey) is the only ssh agent.
+# At login gcr-ssh-agent.socket sets SSH_AUTH_SOCK=$XDG_RUNTIME_DIR/gcr/ssh in
+# the systemd user environment, which GUI apps like VS Code inherit, which
+# overrides ~/.config/environment.d/10-gpg-ssh-agent.conf.
+# The gcr package can't be removed: gvfs requires it, and cosmic-files /
+# cosmic-session require gvfs.
+# Undo: systemctl --user unmask gcr-ssh-agent.socket gcr-ssh-agent.service
+set -euo pipefail
+
+if ! systemctl --user cat gcr-ssh-agent.socket >/dev/null 2>&1; then
+  echo "mask-gcr-ssh-agent: gcr-ssh-agent not installed, skipping" >&2
+  exit 0
+fi
+
+systemctl --user mask --now gcr-ssh-agent.socket gcr-ssh-agent.service
+{{- end }}

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#
+# luks-fido2-enroll — enroll a plugged-in FIDO2 key in an encrypted volume.
+#
+# Usage:
+#   luks-fido2-enroll                 # every attached LUKS volume without a fido2 slot
+#   luks-fido2-enroll /dev/sdb1       # only the given LUKS device
+#
+# Run it by hand after plugging in an encrypted drive. It is not managed by
+# chezmoi apply. Idempotent: volumes that already have a fido2 slot are skipped.
+set -euo pipefail
+
+if ! command -v systemd-cryptenroll >/dev/null 2>&1 || ! command -v lsblk >/dev/null 2>&1; then
+  echo "luks-fido2-enroll: systemd-cryptenroll or lsblk not found" >&2
+  exit 1
+fi
+
+# Only FIDO2 HID nodes count. TPM nodes (/dev/tpm*) are never considered.
+# awk reads all input instead of exiting early: an early exit can SIGPIPE
+# systemd-cryptenroll, and with pipefail that kills the script with status 141.
+fido2_device() {
+  systemd-cryptenroll --fido2-device=list 2>/dev/null \
+    | awk '!found && $1 ~ /^\/dev\/hidraw[0-9]+$/ { print $1; found = 1 }'
+}
+
+if [ "$#" -gt 0 ]; then
+  devs=("$@")
+else
+  # Every LUKS volume that is currently attached.
+  mapfile -t devs < <(lsblk -rpno NAME,FSTYPE | awk '$2 == "crypto_LUKS" { print $1 }')
+fi
+
+if [ "${#devs[@]}" -eq 0 ]; then
+  echo "luks-fido2-enroll: no LUKS volumes attached" >&2
+  exit 1
+fi
+
+fido_dev="$(fido2_device)"
+if [ -z "$fido_dev" ]; then
+  echo "luks-fido2-enroll: no FIDO2 key plugged in" >&2
+  exit 1
+fi
+
+status=0
+for dev in "${devs[@]}"; do
+  if [ ! -b "$dev" ]; then
+    echo "luks-fido2-enroll: $dev is not a block device, skipping" >&2
+    status=1
+    continue
+  fi
+  # Capture the slot list first. Piping into grep -q could SIGPIPE the lister,
+  # which would read as "not enrolled" and add a duplicate fido2 slot.
+  if ! slots="$(sudo systemd-cryptenroll "$dev")"; then
+    echo "luks-fido2-enroll: cannot read LUKS slots on $dev, skipping" >&2
+    status=1
+    continue
+  fi
+  if grep -qw fido2 <<<"$slots"; then
+    echo "luks-fido2-enroll: $dev already has a fido2 slot"
+    continue
+  fi
+  echo "luks-fido2-enroll: enrolling $fido_dev for $dev (passphrase needed, then touch the key)"
+  if ! sudo systemd-cryptenroll "$dev" \
+    --fido2-device="$fido_dev" \
+    --fido2-with-client-pin=no \
+    --fido2-with-user-presence=yes; then
+    echo "luks-fido2-enroll: enrollment failed for $dev" >&2
+    status=1
+  fi
+done
+exit "$status"

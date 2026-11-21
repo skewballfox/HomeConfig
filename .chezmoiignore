@@ -1,9 +1,13 @@
 CLAUDE.md
 {{ if or .isMac (not .hasGUI) }}
 .config/systemd/user/yubikey-touch-detector.service
+.config/environment.d/10-gpg-ssh-agent.conf
 {{ end }}
 {{ if not .hasGUI }}
 Library/LaunchAgents/com.github.maximbaz.yubikey-touch-detector.plist
+{{ end }}
+{{ if or .isMac (not .hasGUI) }}
+.local/bin/luks-fido2-enroll
 {{ end }}
 {{ if not .isMac }}
 .local/bin/kre
