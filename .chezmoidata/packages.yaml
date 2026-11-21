@@ -24,6 +24,13 @@ packages:
     - direnv
     - atuin
     - git-delta
+    # post system-upgrade tasks. dnf only: atomic/coreos upgrades are image
+    # based. See run_onchange_after_fedora-post-upgrade.sh.tmpl
+    - rpmconf
+    - remove-retired-packages
+    - clean-rpm-gpg-pubkey
+    - symlinks
+    - dracut-config-rescue
   ostree:
     - nix-core
   brew:

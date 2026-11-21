@@ -1,0 +1,168 @@
+{{- /*
+Post system-upgrade tasks from
+https://docs.fedoraproject.org/en-US/quick-docs/upgrading-fedora-offline/
+("Optional post-upgrade tasks"). dnf-based Fedora only: atomic/CoreOS upgrades
+are image based.
+
+The Fedora release is part of the rendered script, so chezmoi re-runs it once
+per release. Releases up to 45 render to nothing (chezmoi skips empty scripts),
+so it first runs after the upgrade *from* 45. The script also checks dnf
+history for a matching `system-upgrade`, so a fresh install doesn't trigger it.
+*/ -}}
+{{- if and .isFedora (not .isSilverblue) (gt (atoi .chezmoi.osRelease.versionID) 45) -}}
+#!/usr/bin/env bash
+# fedora release: {{ .chezmoi.osRelease.versionID }}
+set -uo pipefail
+
+release={{ .chezmoi.osRelease.versionID | quote }}
+SUDO={{ .authCmd | quote }}
+
+say() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
+
+# Every step is confirmed by hand, so this needs a terminal.
+if ! { : </dev/tty; } 2>/dev/null; then
+  echo "fedora-post-upgrade: no terminal; run 'chezmoi apply' from a terminal to do the post-upgrade steps" >&2
+  exit 1
+fi
+
+confirm() {
+  local reply
+  read -r -p "$1 [y/N] " reply </dev/tty
+  [[ "$reply" == [yY]* ]]
+}
+
+# Find the system-upgrade transaction that brought us to $release. Its
+# "Releasever" field is the release we upgraded from.
+old_release=""
+while read -r id; do
+  info="$(dnf history info "$id" 2>/dev/null)"
+  if grep -q -- "--releasever=$release\b" <<<"$info"; then
+    old_release="$(awk -F': *' '/^Releasever/ { print $2; exit }' <<<"$info")"
+    break
+  fi
+done < <(dnf history list 2>/dev/null | awk '/system-upgrade/ { print $1 }')
+
+if [ -z "$old_release" ]; then
+  echo "fedora-post-upgrade: no 'dnf system-upgrade' to $release in dnf history, nothing to do"
+  exit 0
+fi
+
+echo "fedora-post-upgrade: upgraded $old_release -> $release. Each step asks first; answer n to skip."
+
+ensure() {
+  rpm -q "$@" >/dev/null 2>&1 || $SUDO dnf install -y "$@"
+}
+ensure rpmconf remove-retired-packages clean-rpm-gpg-pubkey symlinks dracut-config-rescue
+
+# --- Update system configuration files -------------------------------------
+say "Update system configuration files (.rpmnew / .rpmsave)"
+pending="$($SUDO rpmconf -a -t 2>/dev/null || true)"
+if [ -z "$pending" ]; then
+  echo "No .rpmnew/.rpmsave files."
+else
+  printf '%s\n' "$pending"
+  echo "Review /etc/yum.repos.d/ carefully: reverting a third-party repo file can disable its updates."
+  echo "Afterwards check /etc/ssh/sshd_config and /etc/nsswitch.conf; an sshd_config reset re-enables password auth."
+  if confirm "Run 'rpmconf -a' to merge them interactively?"; then
+    $SUDO rpmconf -a
+  fi
+fi
+
+# --- Update GRUB bootloader on BIOS systems --------------------------------
+if [ ! -d /sys/firmware/efi ]; then
+  say "Update GRUB bootloader (BIOS system)"
+  boot_src="$(findmnt -no SOURCE /boot 2>/dev/null || findmnt -no SOURCE /)"
+  boot_disk="/dev/$(lsblk -no PKNAME "$boot_src" | head -n1)"
+  echo "/boot is on $boot_src (disk $boot_disk)."
+  if [ -b "$boot_disk" ] && confirm "Run 'grub2-install $boot_disk'?"; then
+    $SUDO grub2-install "$boot_disk"
+  fi
+fi
+
+# --- Clean-up retired packages ---------------------------------------------
+say "Clean-up retired packages"
+gap=$((release - old_release))
+if [ "$gap" -gt 2 ]; then
+  echo "Upgraded across $gap releases; remove-retired-packages only supports 1 or 2. Skipping."
+elif confirm "Run 'remove-retired-packages $old_release'?"; then
+  remove-retired-packages "$old_release"
+fi
+
+# --- Clean-up old packages -------------------------------------------------
+say "Clean-up old packages"
+echo "The duplicates/extras lists are only valid on a fully updated system."
+if confirm "Run 'dnf upgrade --refresh' first?"; then
+  $SUDO dnf upgrade --refresh
+fi
+
+dups="$($SUDO dnf repoquery --duplicates -q 2>/dev/null)"
+if [ -n "$dups" ]; then
+  printf 'Duplicate packages:\n%s\n' "$dups"
+  confirm "Run 'dnf remove --duplicates'?" && $SUDO dnf remove --duplicates
+else
+  echo "No duplicate packages."
+fi
+
+echo
+echo "Installed packages no longer in any repo (third-party repos show up here too):"
+$SUDO dnf list --extras
+# dnf shows the list and asks before removing anything.
+if confirm "Remove extras (kernels and kmods excluded; dnf confirms the list)?"; then
+  mapfile -t extras < <($SUDO dnf repoquery --extras -q --exclude='kernel,kernel-*,kmod-*')
+  if [ "${#extras[@]}" -gt 0 ]; then
+    $SUDO dnf remove "${extras[@]}"
+  fi
+fi
+
+echo
+echo "dnf autoremove: a package dnf calls unneeded can still be one you use."
+confirm "Run 'dnf autoremove' (dnf confirms the list)?" && $SUDO dnf autoremove
+
+# --- Clean-up old kernels --------------------------------------------------
+say "Clean-up old kernels"
+echo "Running kernel: $(uname -r). Only do this after booting and testing the new kernel."
+mapfile -t old_kernels < <(dnf repoquery --installonly --latest-limit=-1 -q)
+if [ "${#old_kernels[@]}" -eq 0 ]; then
+  echo "No old kernels found."
+else
+  printf '  %s\n' "${old_kernels[@]}"
+  if confirm "Remove these (dnf confirms)?"; then
+    $SUDO dnf remove "${old_kernels[@]}" || echo "Failed to remove old kernels" >&2
+  fi
+fi
+
+# --- Clean-up old keys trusted for RPM package signing ---------------------
+say "Clean-up old RPM signing keys"
+$SUDO clean-rpm-gpg-pubkey --dry-run
+confirm "Remove these keys?" && $SUDO clean-rpm-gpg-pubkey
+
+# --- Clean-up old symlinks -------------------------------------------------
+# Deviation from the doc: `symlinks -r -d /usr` deletes every dangling link,
+# including ones packages ship on purpose (.build-id links to uninstalled
+# subpackages, kernel build/source links, multilib, cockpit branding...).
+# rpm -V then reports them missing and the next update puts them back. Only
+# links no package owns are real leftovers, so only those are offered.
+say "Clean-up old symlinks"
+mapfile -t orphans < <(
+  symlinks -r /usr 2>/dev/null | awk '/^dangling: / { print $2 }' |
+    while read -r link; do rpm -qf "$link" >/dev/null 2>&1 || printf '%s\n' "$link"; done
+)
+if [ "${#orphans[@]}" -eq 0 ]; then
+  echo "No dangling symlinks outside of packages."
+else
+  for link in "${orphans[@]}"; do printf '  %s -> %s\n' "$link" "$(readlink "$link")"; done
+  confirm "Delete these ${#orphans[@]} unowned dangling links?" && $SUDO rm -f -- "${orphans[@]}"
+fi
+
+# --- Update rescue kernel --------------------------------------------------
+say "Rescue kernel"
+echo "dracut-config-rescue regenerates the rescue kernel on kernel updates. Current rescue images:"
+ls -l /boot/*rescue* 2>/dev/null || echo "  (none)"
+
+say "Done"
+echo "Only if something is broken (from the same doc):"
+echo "  rpm warnings:        back up /usr/lib/sysimage/rpm, then sudo rpm --rebuilddb"
+echo "  dependency problems: sudo dnf distro-sync  (or --allowerasing; review removals)"
+echo "  SELinux warnings:    sudo fixfiles -B onboot, then reboot"
+exit 0
+{{- end }}

@@ -9,6 +9,7 @@ set -e
 {{-     $pkgs = concat $pkgs .packages.ostree }}
         brew install {{- range .packages.brew }} {{ . }} {{- end }}
 {{-   else }}
+{{-     $pkgs = concat $pkgs .packages.dnf }}
 {{-     if .hasGUI }}
           {{ $pkgs = concat $pkgs .packages.gui.dnf }}
           # GUI packages
