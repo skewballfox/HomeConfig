@@ -21,10 +21,6 @@ git config --global core.pager delta
 git config --global interactive.difffilter delta --color-only
 git config --global delta.navigate true
 git config --global delta.dark true
-{{- if .isMac }}
-# delta is core.pager; make the mouse wheel scroll in the pager it spawns
-git config --global delta.pager "less -R --mouse"
-{{- end }}
 
 git config --global remote.pushDefault origin
 git config --global push.autoSetupRemote true

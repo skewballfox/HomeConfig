@@ -59,8 +59,6 @@ packages:
     - fish
     - gnupg
     - pinentry-mac
-    # newer less with --mouse; see conf.d/pager
-    - less
   mac_casks:
     - scroll-reverser
   flatpaks:
