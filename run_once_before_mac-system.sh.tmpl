@@ -22,9 +22,23 @@ if [ "$(uname -m)" = arm64 ] && ! /usr/bin/pgrep -q oahd; then
     softwareupdate --install-rosetta --agree-to-license
 fi
 
-# nushell on macOS ignores XDG_CONFIG_HOME set from its own config, so set it
-# for the whole GUI session via a LaunchAgent (survives reboots), and apply it
-# to the running session now.
+# nushell on macOS ignores XDG_CONFIG_HOME/XDG_DATA_HOME/XDG_CACHE_HOME set from
+# its own config and otherwise uses ~/Library/{Application Support,Caches}, so
+# set the XDG base directories for the whole GUI session via a LaunchAgent
+# (survives reboots), and apply them to the running session now. These are the
+# standard XDG defaults, so other shells/apps need no setup on Linux or macOS.
+# XDG_STATE_HOME isn't read by nu, but is set for parity.
+setenv_cmds=""
+for pair in \
+    "XDG_CONFIG_HOME $HOME/.config" \
+    "XDG_DATA_HOME $HOME/.local/share" \
+    "XDG_STATE_HOME $HOME/.local/state" \
+    "XDG_CACHE_HOME $HOME/.cache"; do
+    read -r key val <<<"$pair"
+    setenv_cmds+="/bin/launchctl setenv $key '$val'; "
+    [ "$(launchctl getenv "$key")" = "$val" ] || launchctl setenv "$key" "$val"
+done
+
 agent=~/Library/LaunchAgents/org.xdg.config-home.plist
 mkdir -p "$(dirname "$agent")"
 plist="$(cat <<PLIST
@@ -36,10 +50,9 @@ plist="$(cat <<PLIST
     <string>org.xdg.config-home</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/launchctl</string>
-        <string>setenv</string>
-        <string>XDG_CONFIG_HOME</string>
-        <string>$HOME/.config</string>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>$setenv_cmds</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -48,5 +61,4 @@ plist="$(cat <<PLIST
 PLIST
 )"
 [ "$(cat "$agent" 2>/dev/null)" = "$plist" ] || printf '%s\n' "$plist" >"$agent"
-[ "$(launchctl getenv XDG_CONFIG_HOME)" = "$HOME/.config" ] || launchctl setenv XDG_CONFIG_HOME "$HOME/.config"
 {{- end }}
