@@ -1,0 +1,11 @@
+# ctrl-a: attach to (or start) the background Claude session for this
+# directory; ctrl-a again detaches. Logic: ~/.local/libexec/chat-here.
+# Mirrors fish conf.d/chat-here.fish and nushell autoload/chat-here.nu.
+# Replaces beginning-of-line; use Home for that.
+if [[ $- == *i* ]]; then
+    if [[ ${BLE_VERSION-} ]]; then
+        ble-bind -x C-a ~/.local/libexec/chat-here
+    else
+        bind -x '"\C-a": ~/.local/libexec/chat-here'
+    fi
+fi
