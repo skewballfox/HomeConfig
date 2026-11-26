@@ -1,6 +1,9 @@
 {{- if .hasGUI -}}
 #!/usr/bin/env bash
 # (re)start the service when the pinned release changes: {{ .yubikeyTouchDetector.version }}
+{{- if not .isMac }}
+# ...or when the unit changes: {{ include "private_dot_config/systemd/user/yubikey-touch-detector.service" | sha256sum }}
+{{- end }}
 set -euo pipefail
 
 {{ if .isMac -}}
@@ -10,7 +13,8 @@ launchctl bootout "gui/$UID/$label" 2>/dev/null || true
 launchctl bootstrap "gui/$UID" "$plist"
 {{- else -}}
 systemctl --user daemon-reload
-systemctl --user enable yubikey-touch-detector.service
+# reenable: moves the old default.target.wants link to the current WantedBy
+systemctl --user reenable yubikey-touch-detector.service
 systemctl --user restart yubikey-touch-detector.service
 {{- end }}
 {{- end }}

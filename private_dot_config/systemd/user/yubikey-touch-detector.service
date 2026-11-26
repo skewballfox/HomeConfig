@@ -1,9 +1,16 @@
 [Unit]
 Description=Detects when your YubiKey is waiting for a touch
+# Start inside the graphical session, not at default.target. The detector's
+# gpg proxy auto-starts gpg-agent, so the agent inherits this unit's environment.
+# Started before the compositor imports DISPLAY/WAYLAND_DISPLAY, the agent has
+# no display, and every pinentry that doesn't bring its own (ssh, gpg from a
+# remote host over the forwarded socket) falls back to pinentry-curses.
+PartOf=graphical-session.target
+After=graphical-session.target
 
 [Service]
 ExecStart=%h/.local/bin/yubikey-touch-detector --notify
 Restart=on-failure
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target

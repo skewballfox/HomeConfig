@@ -4,6 +4,9 @@ font_family FiraCode
 map ctrl+c copy_or_interrupt
 map ctrl+v paste_from_clipboard
 map kitty_mod+enter launch --cwd=current
+# ctrl+a toggles shell <-> Claude (fish conf.d/claude.fish). While attached to a
+# Claude session it becomes ctrl+z, which detaches; otherwise fish gets it.
+map --when-focus-on var:claude_attached=1 ctrl+a send_key ctrl+z
 {{- if .isMac }}
 
 macos_option_as_alt left
